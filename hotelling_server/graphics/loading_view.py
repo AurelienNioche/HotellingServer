@@ -37,7 +37,7 @@ class LoadGameNewGameFrame(QWidget, Logger):
         grid_layout = QGridLayout()
 
         self.widgets["localhost"] = QCheckBox()
-        self.widgets["ip_address"] = QLineEdit()
+        self.widgets["php_server"] = QLineEdit()
         
         # Do ugly things to get the right alignment for each widget
         for i, (label, widget) in sorted(enumerate(self.widgets.items())):
@@ -74,14 +74,15 @@ class LoadGameNewGameFrame(QWidget, Logger):
 
     def prepare_network(self):
         
-        self.widgets["ip_address"].setText(get_local_ip())
-        self.widgets["ip_address"].setEnabled(not self.param["local"])
+        self.widgets["php_server"].setText(self.param["php_server"])
+        self.widgets["php_server"].setEnabled(not self.param["local"])
+
         self.widgets["localhost"].setChecked(self.param["local"])
         self.widgets["localhost"].stateChanged.connect(self.switch_line_edit)
 
     def switch_line_edit(self):
         
-        self.widgets["ip_address"].setEnabled(not self.widgets["localhost"].isChecked())
+        self.widgets["php_server"].setEnabled(not self.widgets["localhost"].isChecked())
 
     def click_new_game(self):
 
@@ -125,8 +126,8 @@ class LoadGameNewGameFrame(QWidget, Logger):
 
     def write_network_parameters(self):
 
-        self.param["ip_address"] = self.widgets["ip_address"].text()
+        self.param["php_server"] = self.widgets["php_server"].text()
         self.param["local"] = self.widgets["localhost"].isChecked()
 
-        self.controller.backup.save_param("network", self.param)
+        self.controller.backup.write_param("network", self.param)
         self.controller.data.setup()

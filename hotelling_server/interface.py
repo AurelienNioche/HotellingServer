@@ -3,8 +3,8 @@ from subprocess import getoutput
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget
-
-from .graphics import game_view, loading_view, parametrization_view, setting_up_view, assignment_view, devices_view
+from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
+        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view
 from utils.utils import Logger
 
 
@@ -29,12 +29,15 @@ class UI(QWidget, Logger):
 
         self.frames = dict()
 
+        self.param = dict()
+        self.old_param = dict()
+
         # refresh interface and update data (tables, figures) 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
 
         # noinspection PyUnresolvedReferences
-        self.timer.timeout.connect(self.update_data)
+        self.timer.timeout.connect(self.update_game_view_data)
         self.timer.start()
 
         self.already_asked_for_saving_parameters = 0
@@ -56,34 +59,94 @@ class UI(QWidget, Logger):
         h = dimensions.height() * 0.8  # 80% of the screen height
 
         return 300, 100, w, h
+    
+    # ------------------------ Called by controller methods ---------------------------------------- # 
+
+    def set_previous_parameters(self, params):
+        """Set previous json parameters from data through controller.
+        These params are going to be passed to views."""
+
+        self.param = params.copy()
+
+        # save old params
+        self.old_param = params.copy()
+
+    def set_server_class(self, server_class):
+        """Set current server class (name) choice in order to know 
+        what views and options to display."""
+        
+        self.frames["parametrization"].set_next_frame_previous_frame_methods(server_class.name)
+        self.frames["game"].set_address_type(server_class.name)
+
+    def _get_parameters(self, *keys):
+        """get selected params in order to pass them to view's constructors"""
+        return {k: v for k, v in self.param.items() if k in keys}
+
+    def stop_scanning_network(self):
+
+        self.log("Controller asks 'stop scanning network'")
+        self.frames["devices"].show_device_added()
+
+    def update_participants(self, participants):
+        self.frames["assign_php"].update_participants(participants)
+
+    def save_parameters(self, key, data):
+        self.param[key] = data
 
     def setup(self):
 
+        self.controller_queue = self.mod.controller.queue
+        self.send_go_signal()
+        self.communicate.signal.connect(self.look_for_msg)
+
         self.check_update()
 
-        self.controller_queue = self.mod.controller.queue
+        # get saved geometry
+        try: 
+            self.restoreGeometry(self.settings.value("geometry"))
+
+        except Exception as e:
+            self.log(str(e)) 
+
+    def prepare_frames(self): 
+
+        self.frames["start"] = \
+            start_view.StartFrame(parent=self)
+
+        self.frames["load_game_new_game_tcp"] = \
+            loading_view_tcp.LoadGameNewGameFrameTCP(parent=self, 
+                param=self._get_parameters("network", "folders"))
+
+        self.frames["load_game_new_game_php"] = \
+            loading_view_php.LoadGameNewGameFramePHP(parent=self, 
+                param=self._get_parameters("network", "folders"))
 
         self.frames["devices"] = \
-            devices_view.DevicesFrame(parent=self)
+            devices_view.DevicesFrame(parent=self,
+                param=self._get_parameters("network", "map_android_id_server_id"))
 
-        self.frames["assign"] = \
-            assignment_view.AssignmentFrame(parent=self)
+        self.frames["assign_php"] = \
+            assignment_view_php.AssignmentFramePHP(parent=self,
+                param=self._get_parameters("game", "assignment_php"))
 
-        self.frames["parameters"] = \
-            parametrization_view.ParametersFrame(parent=self)
+        self.frames["assign_tcp"] = \
+            assignment_view_tcp.AssignmentFrameTCP(parent=self,
+                param=self._get_parameters("game", "assignment_tcp"))
+
+        self.frames["parametrization"] = \
+            parametrization_view.ParametersFrame(parent=self,
+                param=self._get_parameters("parametrization"))
 
         self.frames["game"] = \
-            game_view.GameFrame(parent=self)
-
+            game_view.GameFrame(parent=self, 
+                param=self._get_parameters("network"))
+                    
         self.frames["setting_up"] = \
             setting_up_view.SettingUpFrame(parent=self)
 
-        self.frames["load_game_new_game"] = \
-            loading_view.LoadGameNewGameFrame(parent=self)
+        # --------------------------------------------------- # 
 
         self.setWindowTitle(self.app_name)
-
-        self.communicate.signal.connect(self.look_for_msg)
 
         self.setGeometry(*self.dimensions)
 
@@ -98,21 +161,15 @@ class UI(QWidget, Logger):
         self.layout.addLayout(grid, stretch=1)
 
         self.setLayout(self.layout)
-        
-        # get saved geometry
-        try: 
-            self.restoreGeometry(self.settings.value("geometry"))
-
-        except Exception as e:
-            self.log(str(e)) 
-
-        self.send_go_signal()
 
     def check_update(self):
 
         self.log("I check for updates.")
+
         getoutput("git fetch")
-        git_msg = getoutput("git diff origin/master")
+
+        git_msg = getoutput("git diff origin/{}".format(self.mod.git_branch))
+
         self.log("Git message is: '{}'".format(git_msg))
 
         if git_msg:
@@ -167,38 +224,61 @@ class UI(QWidget, Logger):
 
         self.already_asked_for_saving_parameters = 1
 
-        cond1 = sorted(self.mod.controller.data.param["parametrization"].items()) != \
-            sorted(self.frames["parameters"].get_parameters().items())
+        cond0 = sorted(self.old_param.items()) != sorted(self.param.items())
+        cond1 = self.old_param["assignment_php"] == self.param["assignment_php"]
 
-        cond2 = sorted(self.mod.controller.data.param["assignment"]) != \
-            sorted(self.frames["assign"].get_parameters())
-
-        if cond1 or cond2:
+        if cond0 and cond1:
 
             if self.show_question("Do you want to save the change in parameters and assignment?"):
-
-                self.save_parameters("parametrization", self.frames["parameters"].get_parameters())
-                self.save_parameters("assignment", self.frames["assign"].get_parameters())
+                
+                for key in ["parametrization", "assignment_tcp"]:
+                    self.write_parameters(key, self.param[key])
 
             else:
                 self.log('Saving of parameters aborted.')
+    
+    # ------------------------- Called every second methods ------------------------------------- # 
 
-    def update_data(self):
+    def update_figures(self, data):
+        self.frames["game"].update_statistics(data["statistics"])
 
-        if self.mod.controller.running_game.is_set():
-            self.update_tables()
-            self.update_figures()
-
-    def update_figures(self):
-
-        data = self.mod.controller.get_current_data()["statistics"]
-        self.frames["game"].update_statistics(data)
-
-    def update_tables(self):
-
-        data = self.mod.controller.get_current_data()
+    def update_tables(self, data):
         self.frames["game"].update_tables(data)
         self.frames["game"].set_trial_number(data["time_manager_t"])
+    
+    # ------------------------- Method used in order to treat requests from controller ------------ # 
+
+    def look_for_msg(self):
+
+        if not self.occupied.is_set():
+            self.occupied.set()
+
+            msg = self.queue.get()
+            self.log("I received message '{}'.".format(msg))
+
+            command = eval("self.{}".format(msg[0]))
+            args = msg[1:]
+            if args:
+                command(*args)
+            else:
+                command()
+
+            # Able now to handle a new display instruction
+            self.occupied.clear()
+
+        else:
+            # noinspection PyCallByClass, PyTypeChecker
+            QTimer.singleShot(100, self.look_for_msg)
+
+    # ------------------------- "Show" methods -------------------------------------------------- # 
+
+    def show_frame_start(self):
+
+        for frame in self.frames.values():
+            frame.hide()
+
+        self.frames["start"].prepare()
+        self.frames["start"].show()
 
     def show_frame_devices(self):
 
@@ -208,13 +288,21 @@ class UI(QWidget, Logger):
         self.frames["devices"].prepare()
         self.frames["devices"].show()
 
-    def show_frame_load_game_new_game(self):
+    def show_frame_load_game_new_game_tcp(self):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["load_game_new_game"].prepare()
-        self.frames["load_game_new_game"].show()
+        self.frames["load_game_new_game_tcp"].prepare()
+        self.frames["load_game_new_game_tcp"].show()
+
+    def show_frame_load_game_new_game_php(self):
+
+        for frame in self.frames.values():
+            frame.hide()
+
+        self.frames["load_game_new_game_php"].prepare()
+        self.frames["load_game_new_game_php"].show()
 
     def show_frame_game(self, *args):
 
@@ -232,36 +320,44 @@ class UI(QWidget, Logger):
 
         self.frames["setting_up"].show()
 
-    def show_frame_parameters(self):
+    def show_frame_parametrization(self):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["parameters"].prepare()
-        self.frames["parameters"].show()
+        self.frames["parametrization"].prepare()
+        self.frames["parametrization"].show()
 
-    def show_frame_assignment(self):
+    def show_frame_assignment_tcp(self):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["assign"].prepare()
-        self.frames["assign"].show()
+        self.frames["assign_tcp"].prepare()
+        self.frames["assign_tcp"].show()
+
+    def show_frame_assignment_php(self):
+
+        for frame in self.frames.values():
+            frame.hide()
+
+        self.frames["assign_php"].prepare()
+        self.frames["assign_php"].show()
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):
         """question with customs buttons"""
 
-        msgbox = QMessageBox(self)
-        msgbox.setText(msg)
-        msgbox.setInformativeText(question)
-        msgbox.setIcon(QMessageBox.Question)
-        no_button = msgbox.addButton(no, QMessageBox.ActionRole)
-        yes_button = msgbox.addButton(yes, QMessageBox.ActionRole)
-        msgbox.setDefaultButton((no_button, yes_button)[focus == no])
+        msg_box = QMessageBox(self)
+        msg_box.setText(msg)
+        msg_box.setInformativeText(question)
+        msg_box.setIcon(QMessageBox.Question)
+        no_button = msg_box.addButton(no, QMessageBox.ActionRole)
+        yes_button = msg_box.addButton(yes, QMessageBox.ActionRole)
+        msg_box.setDefaultButton((yes_button, no_button)[focus == no])
 
-        msgbox.exec_()
+        msg_box.exec_()
 
-        return msgbox.clickedButton() == yes_button
+        return msg_box.clickedButton() == yes_button
 
     def show_warning(self, msg):
 
@@ -339,7 +435,7 @@ class UI(QWidget, Logger):
         reply_yes = self.show_question(msg=msg, question=question, yes=yes, no=no)
 
         if reply_yes:
-            self.show_frame_load_game_new_game()
+            self.show_frame_start()
             self.stop_bots()
             self.stop_server()
 
@@ -358,7 +454,7 @@ class UI(QWidget, Logger):
         go_back = self.show_question(msg=msg, question=question, yes=yes, no=no)
 
         if go_back:
-            self.show_frame_assignment()
+            self.show_frame_assignment_tcp()
             self.stop_bots()
             self.stop_server()
 
@@ -378,7 +474,7 @@ class UI(QWidget, Logger):
         if not want_to_quit:
             self.frames["devices"].save_mapping()
 
-        self.show_frame_load_game_new_game()
+        self.show_frame_load_game_new_game_tcp()
 
     def fatal_error_of_communication(self):
 
@@ -387,52 +483,20 @@ class UI(QWidget, Logger):
                 "having relaunched the apps on Android's clients.")
 
         if ok:
-            self.show_load_game_new_game_frame()
+            self.show_frame_load_game_new_game_tcp()
 
         else:
             if not self.close():
                 self.manage_fatal_error_of_communication()
                 
-    def stop_scanning_network(self):
+    # ----------------- Methods putting something in controller queue -------------- # 
+    
+    def update_game_view_data(self):
+        self.controller_queue.put(("ui_update_game_view_data", ))
 
-        self.log("Controller asks 'stop scanning network'")
-        self.frames["devices"].show_device_added()
-
-    def look_for_msg(self):
-
-        if not self.occupied.is_set():
-            self.occupied.set()
-
-            msg = self.queue.get()
-            self.log("I received message '{}'.".format(msg))
-
-            command = eval("self.{}".format(msg[0]))
-            args = msg[1:]
-            if args:
-                command(*args)
-            else:
-                command()
-
-            # Able now to handle a new display instruction
-            self.occupied.clear()
-
-        else:
-            # noinspection PyCallByClass, PyTypeChecker
-            QTimer.singleShot(100, self.look_for_msg)
-
-    def get_parameters(self):
-        return self.mod.controller.data.param["parametrization"]
-
-    def get_current_interface_parameters(self):
-        return {"parametrization": self.frames["parameters"].get_parameters(),
-                "assignment": self.frames["assign"].get_parameters()}
-
-    def get_game_parameters(self):
-        return self.mod.controller.data.param["game"]
-
-    def run_game(self):
-        self.controller_queue.put(("ui_run_game", self.get_current_interface_parameters()))
-
+    def tcp_run_game(self):
+        self.controller_queue.put(("ui_tcp_run_game", ))
+    
     def load_game(self, file):
         self.controller_queue.put(("ui_load_game", file))
 
@@ -445,8 +509,8 @@ class UI(QWidget, Logger):
     def retry_server(self):
         self.controller_queue.put(("ui_retry_server", ))
 
-    def save_parameters(self, key, data):
-        self.controller_queue.put(("ui_save_game_parameters", key, data))
+    def write_parameters(self, key, data):
+        self.controller_queue.put(("ui_write_parameters", key, data))
 
     def send_go_signal(self):
         self.controller_queue.put(("ui_send_go_signal", ))
@@ -462,3 +526,22 @@ class UI(QWidget, Logger):
 
     def look_for_alive_players(self):
         self.controller_queue.put(("ui_look_for_alive_players", ))
+
+    def php_scan_button(self):
+        self.controller_queue.put(("ui_php_scan_button", ))
+
+    def php_run_game(self):
+        self.controller_queue.put(("ui_php_run_game", ))
+
+    def set_assignment(self, assignment):
+        self.controller_queue.put(("ui_set_assignment", assignment))
+
+    def set_parametrization(self, param):
+        self.controller_queue.put(("ui_set_parametrization", param))
+    
+    def set_server_parameters(self, param):
+        self.controller_queue.put(("ui_set_server_parameters", param))
+
+    # ---------------------- #
+
+    

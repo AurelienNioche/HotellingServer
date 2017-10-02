@@ -41,7 +41,10 @@ class Data(Logger):
         self.time_manager_ending_t = None
         self.continue_game = True
 
+        self.assignment_tcp = {}
+        self.assignment_php = {}
         self.assignment = {}
+
         self.parametrization = {}
         self.roles = []
 
@@ -49,14 +52,14 @@ class Data(Logger):
 
         self.keys = [
             "network", "game", "folders", "map_android_id_server_id",
-            "parametrization", "assignment"]
+            "parametrization", "assignment_tcp", "assignment_php", "map_php"]
 
         self.param = {}
         self.setup()
 
     def new(self):
         """when a new game is launched"""
-
+        
         self.current_state = {s: [] for s in self.entries}
 
         self.firms_id = {}  # key: game_id, value: firm_id
@@ -64,7 +67,7 @@ class Data(Logger):
 
         self.bot_firms_id = {}
         self.bot_customers_id = {}
-
+        
         self.map_server_id_android_id = {}
         self.map_server_id_game_id = {}
 
@@ -83,9 +86,9 @@ class Data(Logger):
             with open("hotelling_server/parameters/{}.json".format(key)) as file:
                 self.param[key] = json.load(file)
 
-    def save_param(self, key, new_value):
+    def write_param(self, key, new_value):
 
-        self.controller.backup.save_param(key, new_value)
+        self.controller.backup.write_param(key, new_value)
 
     def save(self):
 
@@ -105,7 +108,8 @@ class Data(Logger):
                 "time_manager_ending_t": self.controller.time_manager.ending_t,
                 "continue": self.controller.time_manager.continue_game,
                 "time_manager_state": self.controller.time_manager.state,
-                "assignment": self.assignment,
+                "assignment_tcp": self.assignment_tcp,
+                "assignment_php": self.assignment_php,
                 "parametrization": self.parametrization
             }
         )
@@ -131,7 +135,8 @@ class Data(Logger):
         self.time_manager_t = data["time_manager_t"]
         self.time_manager_ending_t = data["time_manager_ending_t"]
         self.continue_game = data["continue"]
-        self.assignment = data["assignment"]
+        self.assignment_tcp = data["assignment_tcp"]
+        self.assignment_php = data["assignment_php"]
         self.parametrization = data["parametrization"]
 
     def update_history(self):

@@ -8,10 +8,12 @@ class ParametersFrame(QWidget, Logger):
 
     name = "ParametersFrame"
 
-    def __init__(self, parent):
+    def __init__(self, parent, param):
 
         # noinspection PyArgumentList
         QWidget.__init__(self, parent=parent)
+
+        self.param = param
 
         self.layout = QVBoxLayout()
 
@@ -23,28 +25,32 @@ class ParametersFrame(QWidget, Logger):
         self.group.addButton(self.previous_button)
         self.group.addButton(self.run_button)
 
-        self.parameters = dict()
+        self.widgets = dict()
 
         self.error = None
 
         self.order = ["save",
                       "exploration_cost",
                       "utility_consumption"]
+        
+        # These two depends on server class choice
+        self.show_frame_assignment = None
+        self.show_frame_game = None
 
         self.setup()
 
     def setup(self):
+        
+        param = self.param["parametrization"]
 
-        param = self.parent().get_parameters()
-
-        self.parameters["save"] = \
+        self.widgets["save"] = \
             CheckParameter(text="Save results", checked=param["save"])
 
-        self.parameters["exploration_cost"] = \
+        self.widgets["exploration_cost"] = \
             IntParameter(text="Exploration cost",
                          initial_value=param["exploration_cost"], value_range=[0, 100])
 
-        self.parameters["utility_consumption"] = \
+        self.widgets["utility_consumption"] = \
             IntParameter(text="Utility consumption",
                          initial_value=param["utility_consumption"], value_range=[0, 100])
 
@@ -55,6 +61,14 @@ class ParametersFrame(QWidget, Logger):
 
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
+    
+    def set_next_frame_previous_frame_methods(self, server_name):
+
+        self.show_frame_assignment = (self.parent().show_frame_assignment_tcp, 
+                self.parent().show_frame_assignment_php)[server_name == "PHPServer"]
+
+        self.show_frame_game = (self.parent().tcp_run_game, 
+                self.parent().php_run_game)[server_name == "PHPServer"]
 
     def fill_layout(self):
 
@@ -62,7 +76,7 @@ class ParametersFrame(QWidget, Logger):
         grid_layout = QGridLayout()
 
         for i, key in enumerate(self.order):
-            self.parameters[key].add_to_grid_layout(grid_layout, i, 0)
+            self.widgets[key].add_to_grid_layout(grid_layout, i, 0)
 
         horizontal_layout = QHBoxLayout()
         horizontal_layout.addWidget(self.previous_button, alignment=Qt.AlignCenter)
@@ -82,7 +96,12 @@ class ParametersFrame(QWidget, Logger):
         else:
             self.log("Push 'run' button.")
 
-            self.parent().run_game()
+            self.param["parametrization"] = self.get_widgets_values()
+            self.parent().save_parameters("parametrization", self.param["parametrization"])
+            self.parent().set_parametrization(self.param["parametrization"])
+
+            # self.parent().tcp_run_game() / self.parent().php_run_game()
+            self.show_frame_game()
 
     def push_previous_button(self):
 
@@ -92,24 +111,26 @@ class ParametersFrame(QWidget, Logger):
 
         else:
             self.log("Push 'previous' button.")
-            self.parent().show_frame_assignment()
+            
+            # self.parent().show_frame_assignement_tcp/php()
+            self.show_frame_assignment()
 
-    def get_parameters(self):
+    def get_widgets_values(self):
 
-        parameters = {}
+        values = {}
 
         self.error = 0
-        for parameter_name in self.parameters:
+        for parameter_name in self.widgets:
 
-            value = self.parameters[parameter_name].get_value()
+            value = self.widgets[parameter_name].get_value()
             if type(value) == str and value[0] == "!":
 
                 self.error = value[1:]
                 break
             else:
-                parameters[parameter_name] = value
+                values[parameter_name] = value
 
-        return parameters
+        return values
 
     def show_warning(self, **instructions):
 

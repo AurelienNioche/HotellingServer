@@ -11,6 +11,8 @@ class Model:
 
     def __init__(self):
 
+        self.git_branch = "php_server"
+
         self.app = QApplication(sys.argv)
         self.ui = interface.UI(model=self)
         self.controller = controller.Controller(model=self)

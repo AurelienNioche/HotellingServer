@@ -16,9 +16,9 @@ class Game(Logger):
         self.time_manager = self.controller.time_manager
 
         # get parameters from interface and json files
-        self.game_parameters = self.controller.data.param["game"]
-        self.parametrization = self.controller.data.param["parametrization"]
-        self.assignment = self.controller.data.param["assignment"]
+        self.game_parameters = self.data.param["game"]
+        self.parametrization = self.data.param["parametrization"]
+        self.assignment = None
 
         # set number of type of players
         self.n_customers = self.game_parameters["n_customers"]
@@ -32,15 +32,11 @@ class Game(Logger):
 
         # ----------------------------------- sides methods --------------------------------------#
 
-    def new(self, parameters):
+    def new(self):
         """called if new game is launched"""
 
-        # parameters coming from interface
-        self.data.parametrization = parameters["parametrization"]
-        self.data.assignment = parameters["assignment"]
-
-        self.interface_parameters = self.data.parametrization
         self.assignment = self.data.assignment
+        self.interface_parameters = self.data.parametrization
 
         self.unexpected_id_list = []
 
@@ -82,8 +78,8 @@ class Game(Logger):
 
         self.data.setup()
         self.interface_parameters = self.data.parametrization
-        self.assignment = self.data.assignment
         self.unexpected_id_list = []
+        self.assignment = self.data.assignment
 
         self.launch_bots()
 
@@ -156,8 +152,9 @@ class Game(Logger):
         # in case of no matching id
         if server_id not in self.unexpected_id_list:
             self.unexpected_client_id(server_id)
-
+        
     def unexpected_client_id(self, server_id):
+
         self.controller.ask_interface("unexpected_client_id", server_id)
         self.unexpected_id_list.append(server_id)
 
@@ -271,11 +268,17 @@ class Game(Logger):
     def check_end(self, client_t):
         return int(client_t == self.time_manager.ending_t) if self.time_manager.ending_t else 0
 
-    @staticmethod
-    def reply(*args):
-        return "reply/{}".format("/".join(
-            [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args]
-        ))
+    def reply(self, *args):
+        msg = {
+            "game_id": args[0],
+            "response": "reply/{}".format("/".join(
+                [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args[1:]]
+            ))}
+
+        if self.controller.server.name == "PHPServer":
+            return msg
+        else: 
+            return msg["response"]
 
     def get_all_states(self):
         return self.data.current_state["firm_states"] + self.data.current_state["customer_states"]
@@ -290,14 +293,31 @@ class Game(Logger):
         self.data.current_state["{}_states".format(role)][role_id] = state
 
     # -----------------------------------| init methods |--------------------------------------#
+    
+    def ask_init(self, name):
+        
+        if not self.is_ended():
+            
+            cond = self.controller.server.name == "TCPServer"
+            
+            if cond:
 
-    def ask_init(self, android_id):
+                return self.ask_init_tcp(function_name(), name)
+
+            else:
+
+                return self.ask_init_php(function_name(), name)
+        else:
+            return "Game ended. Connection refused"
+
+    def ask_init_tcp(self, func_name, client_name):
 
         server_id, game_id = \
-            self.controller.id_manager.get_ids_from_android_id(android_id, max_n=len(self.data.roles))
+            self.controller.id_manager.get_ids_from_android_id(
+                client_name, max_n=len(self.data.roles))  # Should not be here
 
         if game_id != -1:
-
+            
             role = self.get_role(server_id)
 
             if not role:
@@ -306,13 +326,35 @@ class Game(Logger):
             self.data.roles[game_id] = role
 
             if role == "firm":
-                return self.init_firms(function_name(), game_id, role)
+                return self.init_firms(func_name, game_id, role)
 
             else:
-                return self.init_customers(function_name(), game_id, role)
+                return self.init_customers(func_name, game_id, role)
 
         else:
             return "Error with ID manager. Maybe not authorized to participate."
+
+    def ask_init_php(self, func_name, game_id):
+
+        client_name = self.controller.id_manager.get_client_name_from_game_id(game_id)  # Should not be here
+        role = self.get_role(client_name)
+
+        self.data.roles[game_id] = role
+
+        if role == "firm":
+            rep = self.init_firms(func_name, game_id, role)
+        else:
+            rep = self.init_customers(func_name, game_id, role)
+
+        # Suppress the 'role' arg in the response.
+        args = rep["response"].split("/")
+        args.pop(3)  # 3 is the index of the 'role' arg.
+
+        without_role_args = "/".join([a for a in args])
+
+        rep["response"] = without_role_args
+
+        return rep
 
     def init_customers(self, func_name, game_id, role):
 
@@ -323,9 +365,6 @@ class Game(Logger):
         else:
             customer_id = self.data.customers_id[game_id]
 
-        if self.is_ended():
-            return "error/game_ended"
-
         position, exploration_cost, utility_consumption, utility = self.get_customers_data(customer_id)
 
         self.check_remaining_agents()
@@ -333,7 +372,8 @@ class Game(Logger):
         self.set_state(role="customer", role_id=customer_id, state=function_name())
 
         return self.reply(
-            func_name, game_id, self.time_manager.t, role, position, exploration_cost,
+            game_id,
+            func_name, self.time_manager.t, role, position, exploration_cost,
             utility_consumption, utility)
 
     def get_customers_data(self, customer_id):
@@ -355,16 +395,13 @@ class Game(Logger):
         else:
             firm_id = self.data.firms_id[game_id]
 
-        if self.is_ended():
-            return "error/game_ended"
-
         state, position, price, opp_position, opp_price, profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
         self.set_state(role="firm", role_id=firm_id, state=function_name())
 
-        return self.reply(func_name, game_id, self.time_manager.t, role, position, state, price,
+        return self.reply(game_id, func_name, self.time_manager.t, role, position, state, price,
                           opp_position, opp_price, profits)
 
     def get_firms_data(self, firm_id):
@@ -397,7 +434,7 @@ class Game(Logger):
 
                 self.set_state(role="customer", role_id=customer_id, state=function_name())
 
-                return self.reply(function_name(), self.time_manager.t, x[0], x[1], prices[0], prices[1])
+                return self.reply(game_id, function_name(), self.time_manager.t, x[0], x[1], prices[0], prices[1])
             else:
                 return "error/wait"
 
@@ -408,7 +445,7 @@ class Game(Logger):
             x = self.data.history["firm_positions"][t]
             prices = self.data.history["firm_prices"][t]
 
-            return self.reply(function_name(), t, x[0], x[1], prices[0], prices[1])
+            return self.reply(game_id, function_name(), t, x[0], x[1], prices[0], prices[1])
 
     def ask_customer_choice_recording(self, game_id, t, extra_view, firm):
 
@@ -420,7 +457,7 @@ class Game(Logger):
 
         if t == self.time_manager.t:
 
-            out = self.reply(function_name(), self.time_manager.t, self.check_end(t))
+            out = self.reply(game_id, function_name(), self.time_manager.t, self.check_end(t))
 
             if not self.data.current_state["customer_replies"][customer_id]:
 
@@ -440,7 +477,7 @@ class Game(Logger):
             return "error/time_is_superior"
 
         else:
-            return self.reply(function_name(), t, self.check_end(t))
+            return self.reply(game_id, function_name(), t, self.check_end(t))
 
     # ----------------------------------| passive firm demands |-------------------------------------- #
 
@@ -457,7 +494,7 @@ class Game(Logger):
             if self.time_manager.state == "active_has_played" or \
                     self.time_manager.state == "active_has_played_and_all_customers_replied":
 
-                out = self.reply(
+                out = self.reply(game_id, 
                     function_name(),
                     self.time_manager.t,
                     self.data.current_state["firm_positions"][opponent_id],
@@ -478,6 +515,7 @@ class Game(Logger):
         else:
 
             return self.reply(
+                game_id,
                 function_name(),
                 t,
                 self.data.history["firm_positions"][t][opponent_id],
@@ -499,9 +537,9 @@ class Game(Logger):
 
                     choices = self.get_client_choices(firm_id, t)
 
-                    out = self.reply(function_name(), self.time_manager.t, choices, self.check_end(t))
+                    out = self.reply(game_id, function_name(), self.time_manager.t, choices, self.check_end(t))
                     
-                    self.firm_end_of_turn(game_id=game_id, firm_id=firm_id, t=t, status="passive")
+                    self.firm_end_of_turn(firm_id=firm_id, t=t, status="passive")
 
                     state = "end_game" if self.check_end(t) else function_name()
                     self.set_state(role="firm", role_id=firm_id, state=state)
@@ -518,7 +556,7 @@ class Game(Logger):
 
         else:
             choices = self.get_client_choices(firm_id, t)
-            return self.reply(function_name(), t, choices, self.check_end(t))
+            return self.reply(game_id, function_name(), t, choices, self.check_end(t))
 
     # -----------------------------------| active firm demands |-------------------------------------- #
 
@@ -532,7 +570,7 @@ class Game(Logger):
 
         if t == self.time_manager.t:
 
-            out = self.reply(function_name(), self.time_manager.t)
+            out = self.reply(game_id, function_name(), self.time_manager.t)
 
             if not self.data.current_state["active_replied"]:
 
@@ -548,7 +586,7 @@ class Game(Logger):
             return "error/time_is_superior"
 
         else:
-            return self.reply(function_name(), t)
+            return self.reply(game_id, function_name(), t)
 
     def ask_firm_active_customer_choices(self, game_id, t):
         """called by active firm"""
@@ -564,9 +602,9 @@ class Game(Logger):
 
                 choices = self.get_client_choices(firm_id, t)
 
-                out = self.reply(function_name(), self.time_manager.t, choices, self.check_end(t))
+                out = self.reply(game_id, function_name(), self.time_manager.t, choices, self.check_end(t))
 
-                self.firm_end_of_turn(game_id=game_id, firm_id=firm_id, t=t, status="active")
+                self.firm_end_of_turn(firm_id=firm_id, t=t, status="active")
                 
                 state = "end_game" if self.check_end(t) else function_name()
                 self.set_state(role="firm", role_id=firm_id, state=state)
@@ -583,4 +621,4 @@ class Game(Logger):
 
         else:
             choices = self.get_client_choices(firm_id, t)
-            return self.reply(function_name(), t, choices, self.check_end(t))
+            return self.reply(game_id, function_name(), t, choices, self.check_end(t))

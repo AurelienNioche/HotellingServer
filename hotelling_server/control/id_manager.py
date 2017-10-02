@@ -10,6 +10,10 @@ class IDManager(Logger):
         self.controller = controller
         self.data = controller.data
         self.parameters = None
+    
+    def get_client_name_from_game_id(self, game_id):
+
+        return self.data.param["map_php"][str(game_id)]
 
     def get_ids_from_android_id(self, android_id, max_n):
 

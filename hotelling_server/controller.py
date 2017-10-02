@@ -2,7 +2,7 @@ from multiprocessing import Queue, Event
 from threading import Thread
 
 from utils.utils import Logger
-from hotelling_server.control import backup, data, game, server, statistician, id_manager, time_manager
+from hotelling_server.control import backup, data, game, php_server, tcp_server, statistician, id_manager, time_manager
 
 
 class Controller(Thread, Logger):
@@ -31,15 +31,15 @@ class Controller(Thread, Logger):
         self.id_manager = id_manager.IDManager(controller=self)
         self.backup = backup.Backup(controller=self)
         self.statistician = statistician.Statistician(controller=self)
-        self.server = server.Server(controller=self)
         self.game = game.Game(controller=self)
+        self.server = None
 
         # For giving instructions to graphic process
         self.graphic_queue = self.mod.ui.queue
         self.communicate = self.mod.ui.communicate
 
         # For giving go signal to server
-        self.server_queue = self.server.queue
+        self.server_queue = None
 
     def run(self):
 
@@ -47,8 +47,16 @@ class Controller(Thread, Logger):
         go_signal_from_ui = self.queue.get()
         self.log("Got go signal from UI: '{}'.".format(go_signal_from_ui))
 
+        # Send previous params to UI
+        self.ask_interface("set_previous_parameters", self.data.param)
+        
+        # Prepares ui frames
+        self.ask_interface("prepare_frames")
+
         self.ask_interface("show_frame_setting_up")
-        self.ask_interface("show_frame_load_game_new_game")
+
+        # Start
+        self.ask_interface("show_frame_start")
 
         while not self.shutdown.is_set():
 
@@ -115,7 +123,6 @@ class Controller(Thread, Logger):
 
         self.log("Stop server.")
         self.server.shutdown()
-        self.server.wait_event.set()
 
     def start_server(self):
 
@@ -140,21 +147,17 @@ class Controller(Thread, Logger):
 
         self.device_scanning_event.clear()
         self.ask_interface("stop_scanning_network")
-     
+
     # ------------------------------- Message handling ----------------------------------------------- #
 
     def handle_message(self, message):
 
-        try:
-            command = message[0]
-            args = message[1:]
-            if len(args):
-                eval("self.{}(*args)".format(command))
-            else:
-                eval("self.{}()".format(command))
-
-        except Exception as err:
-            self.ask_interface("fatal_error", str(err))
+        command = message[0]
+        args = message[1:]
+        if len(args):
+            eval("self.{}(*args)".format(command))
+        else:
+            eval("self.{}()".format(command))
 
     # ------------------------------ Server interface ----------------------------------------#
 
@@ -162,7 +165,6 @@ class Controller(Thread, Logger):
 
         self.log("Server running.")
         self.running_server.set()
-        self.server.wait_event.clear()
 
     def server_error(self, error_message):
 
@@ -173,23 +175,39 @@ class Controller(Thread, Logger):
         
         # when using device manager to add new clients to json mapping
         if self.device_scanning_event.is_set():
-
             self.add_device_to_map_android_id_server_id(server_data)
         
         # When game is launched
         else:
-
             response = self.game.handle_request(server_data)
             self.server_queue.put(("reply", response))
    
     # ------------------------------ UI interface  -------------------------------------------#
 
-    def ui_run_game(self, interface_parameters):
+    def ui_set_server(self, server_class):
+        self.log("Server's class: {}".format(server_class))
+        self.server = server_class(controller=self)
+        self.server_queue = self.server.queue
+        self.ask_interface("set_server_class", server_class)
+    
+    def ui_set_server_parameters(self, param):
+        self.log("Setting server parameters from interface: {}".format(param))
+        self.server.setup(param)
+
+    def ui_set_assignment(self, assignment):
+        self.log("Setting game assignement from interface: {}".format(assignment))
+        self.data.assignment = assignment
+
+    def ui_set_parametrization(self, param):
+        self.log("Setting parametrization from interface : {}".format(param))
+        self.data.parametrization = param
+
+    def ui_tcp_run_game(self):
         self.log("UI ask 'run game'.")
         self.data.new()
         self.time_manager.setup()
         self.launch_game()
-        self.game.new(interface_parameters)
+        self.game.new()
 
     def ui_load_game(self, file):
         self.log("UI ask 'load game'.")
@@ -210,10 +228,18 @@ class Controller(Thread, Logger):
         self.log("UI ask 'retry server'.")
         self.server_queue.put(("Go",))
 
-    def ui_save_game_parameters(self, key, value):
-        self.log("UI ask 'save game parameters'.")
-        self.data.save_param(key, value)
-        self.log("Save interface parameters.")
+    def ui_write_parameters(self, key, value):
+        self.log("UI ask 'write parameters'.")
+        self.data.write_param(key, value)
+        self.log("Write interface parameters to json files.")
+
+    def ui_update_game_view_data(self):
+
+        if self.running_game.is_set():
+
+            self.log("UI asks 'update data'.")
+            self.ask_interface("update_tables", self.get_current_data())
+            self.ask_interface("update_figures", self.get_current_data())
 
     def ui_stop_bots(self):
         self.log("UI ask 'stop bots'.")
@@ -225,9 +251,11 @@ class Controller(Thread, Logger):
 
     def ui_look_for_alive_players(self):
 
+        self.log("UI asks 'look for alive players'.")
+        
         if self.game.is_ended():
 
-            self.ask_interface("show_frame_load_game_new_game")
+            self.ask_interface("show_frame_start")
             self.stop_server()
             self.game.stop_bots()
 
@@ -235,6 +263,47 @@ class Controller(Thread, Logger):
 
             self.ask_interface("force_to_quit_game")
 
+    def ui_php_run_game(self):
+
+        potential_participants = self.server.get_waiting_list()
+
+        self.server.ask_for_erasing_tables()
+        
+        # add self.data.n_agents?
+        participants = \
+            potential_participants[:self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]]
+
+        roles = [i[1] for i in self.data.assignment if i[2] is False]  # Order is 'name', 'role', 'bot'
+        # Why not -> [role for name, role, bot in self.data.assignement if not bot]?
+
+        # write participants mapping to json file
+        mapping = {str(i): participants[i] for i in range(len(participants))}
+        
+        self.data.param["map_php"] = mapping
+        self.data.write_param("map_php", mapping)
+
+        self.server.authorize_participants(participants, roles)
+
+        self.ask_interface("show_frame_parametrization")
+
+        self.log("UI ask 'run game'.")
+        self.data.new()
+        self.time_manager.setup()
+        self.launch_game()
+        self.game.new()
+
+    def ui_php_scan_button(self):
+
+        n_player = self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]
+        waiting_list = self.server.get_waiting_list()  # Potential conflict with the call in 'push_next_button'
+
+        if len(waiting_list) <= n_player:
+            participants = waiting_list
+        else:
+            participants = waiting_list[:n_player]
+
+        self.ask_interface("update_participants", participants)
+    
     # ------------------------------ Time Manager interface ------------------------------------ #
 
     def time_manager_stop_game(self):
@@ -264,7 +333,8 @@ class Controller(Thread, Logger):
             "roles": self.data.roles,
             "time_manager_t": self.data.controller.time_manager.t,
             "statistics": self.statistician.data,
-            "map_server_id_game_id": self.data.map_server_id_game_id
+            "map_server_id_game_id": self.data.map_server_id_game_id,
+            "assignment": self.data.assignment
         }
 
     def get_parameters(self, key):

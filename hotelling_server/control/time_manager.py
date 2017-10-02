@@ -38,13 +38,13 @@ class TimeManager(Logger):
                 self.state = "active_has_played"
                 self.log("NEW STATE: {}.".format(self.state))
         
-        # Then customers need to choose a perimeter as well as a firm to buy to
+        # Then customers need to choose a perimeter as well as a firm to buy from
         elif self.state == "active_has_played":
             if np.sum(self.data.current_state["customer_replies"]) == self.data.param["game"]["n_customers"]:
                 self.state += "_and_all_customers_replied"
                 self.log("NEW STATE: {}.".format(self.state))
 
-        # Firms need to know their scores, then it is the end of the turn
+        # Firms need to know their respective scores, then it is the end of the turn
         elif self.state == "active_has_played_and_all_customers_replied":
             if self.data.current_state["passive_gets_results"] and self.data.current_state["active_gets_results"]:
 
@@ -52,7 +52,7 @@ class TimeManager(Logger):
                 self.log("NEW STATE: {}.".format(self.state))
                 self.end_time_step()
                 
-                # If the game did not ended
+                # If the game did not end
                 if self.state != "end_game":
                     self.beginning_time_step()
                     self.state = "beginning_time_step"

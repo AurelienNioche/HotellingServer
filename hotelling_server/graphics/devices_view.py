@@ -11,13 +11,13 @@ class DevicesFrame(QWidget, Logger):
 
     name = "DevicesFrame"
 
-    def __init__(self, parent):
+    def __init__(self, parent, param):
 
         super().__init__(parent=parent)
 
-        self.layout = QVBoxLayout()
+        self.param = param
 
-        self.controller = parent.mod.controller
+        self.layout = QVBoxLayout()
 
         self.quit_button = QPushButton()
         self.save_button = QPushButton()
@@ -47,6 +47,8 @@ class DevicesFrame(QWidget, Logger):
         self.timer = QTimer()
         # noinspection PyUnresolvedReferences
         self.timer.timeout.connect(self.show_no_device_found)
+
+        self.max_scanning_time = 15000  # ms
 
         self.table = QTableWidget()
         self.form_layout = QFormLayout()
@@ -193,7 +195,7 @@ class DevicesFrame(QWidget, Logger):
 
         self.log("Push 'add' button")
         
-        ip = self.controller.get_parameters("network")["ip_address"]
+        ip = self.param["network"]["ip_address"]
         self.label_scanning.setText("Scanning with ip '{}' ...".format(ip))
 
         self.show_scanning()
@@ -219,9 +221,9 @@ class DevicesFrame(QWidget, Logger):
 
     def launch_scan(self):
         
-        self.timer.start(15000)
+        self.timer.start(self.max_scanning_time)
 
-        self.controller.queue.put(("scan_network_for_new_devices", ))
+        self.parent().scan_network_for_new_devices()
         
     def push_save_button(self):
 
@@ -233,10 +235,7 @@ class DevicesFrame(QWidget, Logger):
 
             self.show_info(msg="Mapping successfully saved in 'map_android_id_server_id.json'.")
 
-            # update data
-            self.controller.data.setup()
-
-            self.parent().show_frame_load_game_new_game()
+            self.parent().show_frame_load_game_new_game_tcp()
 
     def check_mapping(self, mapping_to_check):
 
@@ -250,7 +249,7 @@ class DevicesFrame(QWidget, Logger):
 
     def prepare_table(self):
 
-        data = self.controller.get_parameters("map_android_id_server_id")
+        data = self.param["map_android_id_server_id"]
 
         sorted_data = sorted(data.items(), key=operator.itemgetter(1))
 
@@ -292,10 +291,6 @@ class DevicesFrame(QWidget, Logger):
         new_mapping = {k: int(v) if str(v).isdigit() else v for k, v in zip(keys, values)}
 
         return new_mapping, mapping_to_check
-
-    def write_map_android_id_server_id(self, new_mapping):
-
-        self.controller.backup.save_param("map_android_id_server_id", new_mapping)
 
     @staticmethod
     def check_mapping_validity(mapping_to_check):
@@ -377,3 +372,9 @@ class DevicesFrame(QWidget, Logger):
         
         for widget in self.scanning_widgets:
             widget.show()
+
+    def write_map_android_id_server_id(self, new_mapping):
+
+        self.parent().write_parameters("map_android_id_server_id", new_mapping)
+
+

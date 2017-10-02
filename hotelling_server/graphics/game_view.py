@@ -14,11 +14,15 @@ class GameFrame(QWidget, Logger):
 
     name = "GameFrame"
 
-    def __init__(self, parent):
+    def __init__(self, parent, param):
 
         super().__init__(parent=parent)
 
         self.layout = QVBoxLayout()
+
+        self.param = param
+
+        self.controller = self.parent().mod.controller
 
         self.stop_button = QPushButton()
         self.switch_button = QPushButton()
@@ -28,7 +32,7 @@ class GameFrame(QWidget, Logger):
 
         self.trial_counter = TrialCounter()
 
-        self.ip_address = QLabel()
+        self.address_label = QLabel()
 
         self.plot_layout = dict()
 
@@ -58,6 +62,13 @@ class GameFrame(QWidget, Logger):
 
         self.setup()
 
+    def set_address_type(self, server_name):
+
+        self.address_text = (
+                "IP: {}".format(self.param["network"]["ip_address"]), 
+                "Server url: {}".format(self.param["network"]["php_server"])
+            )[server_name == "PHPServer"]
+
     def setup(self):
 
         self.setLayout(self.layout)
@@ -77,7 +88,7 @@ class GameFrame(QWidget, Logger):
         self.layout.addWidget(self.stop_button, stretch=0, alignment=Qt.AlignBottom)
 
         # add to layout
-        self.layout.addWidget(self.ip_address, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.address_label, alignment=Qt.AlignCenter)
 
         # noinspection PyUnresolvedReferences
         self.stop_button.clicked.connect(self.push_stop_button)
@@ -90,18 +101,15 @@ class GameFrame(QWidget, Logger):
         self.prepare_figures()
         self.prepare_buttons()
         self.prepare_tables(parameters)
-        self.prepare_ip_label()
+        self.prepare_address_label()
         self.log("Preparation done!")
 
-    def prepare_ip_label(self):
-
-        if not self.parent().mod.controller.server.wait_event.is_set():
-            # set ip address
-            text = self.parent().mod.controller.server.tcp_server.ip
-            font = QFont()
-            font.setPointSize(20)
-            self.ip_address.setFont(font)
-            self.ip_address.setText("IP: {}".format(text))
+    def prepare_address_label(self):
+        
+        self.address_label.setText(self.address_text)
+        font = QFont()
+        font.setPointSize(20)
+        self.address_label.setFont(font)
 
     def prepare_figures(self):
 
@@ -155,12 +163,12 @@ class GameFrame(QWidget, Logger):
 
     def prepare_tables(self, parameters):
 
-        ids, labels, fancy_labels = self.get_tables_data(parameters)
-        ids = self.parent().mod.controller.data.assignment
+        assignment, ids, labels, fancy_labels = self.get_tables_data(parameters)
 
         for role in ["firm", "customer"]:
 
-            rows = [server_id for server_id, j, k in ids if j == role]
+            rows = [server_id for server_id, j, k in assignment if j == role]
+
             columns = fancy_labels[role]
 
             # empty tables
@@ -191,7 +199,7 @@ class GameFrame(QWidget, Logger):
 
     def update_tables(self, parameters):
 
-        ids, labels, fancy_labels = self.get_tables_data(parameters)
+        assignment, ids, labels, fancy_labels = self.get_tables_data(parameters)
 
         for role in ["firm", "customer"]:
 
@@ -229,8 +237,9 @@ class GameFrame(QWidget, Logger):
 
         ids = self.get_ids(parameters)
         labels, fancy_labels = self.get_labels()
+        assignment = parameters["assignment"]
 
-        return ids, labels, fancy_labels
+        return assignment, ids, labels, fancy_labels
 
     @staticmethod
     def get_ids(parameters):
