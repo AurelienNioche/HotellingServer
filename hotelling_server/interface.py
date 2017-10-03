@@ -71,12 +71,16 @@ class UI(QWidget, Logger):
         # save old params
         self.old_param = params.copy()
 
-    def set_server_class(self, server_class):
+    def set_server_class_parametrization_frame(self, server_class):
         """Set current server class (name) choice in order to know 
         what views and options to display."""
         
         self.frames["parametrization"].set_next_frame_previous_frame_methods(server_class.name)
-        self.frames["game"].set_address_type(server_class.name)
+    
+    def set_server_address_game_frame(self, address):
+        """Set server address displayed in game_view"""
+
+        self.frames["game"].set_server_address(address)
 
     def _get_parameters(self, *keys):
         """get selected params in order to pass them to view's constructors"""
@@ -223,11 +227,10 @@ class UI(QWidget, Logger):
     def check_for_saving_parameters(self):
 
         self.already_asked_for_saving_parameters = 1
+        
+        cond = sorted(self.old_param.items()) != sorted(self.param.items())
 
-        cond0 = sorted(self.old_param.items()) != sorted(self.param.items())
-        cond1 = self.old_param["assignment_php"] == self.param["assignment_php"]
-
-        if cond0 and cond1:
+        if cond:
 
             if self.show_question("Do you want to save the change in parameters and assignment?"):
                 

@@ -7,6 +7,7 @@ import numpy as np
 from hotelling_server.graphics.widgets.plot_layouts import PlotLayout
 from hotelling_server.graphics.widgets.plot import OneLinePlot, TwoLinesPlot
 from hotelling_server.graphics.widgets.trial_counter import TrialCounter
+from hotelling_server.graphics.widgets.table_layouts import TableLayout
 from utils.utils import Logger
 
 
@@ -27,14 +28,12 @@ class GameFrame(QWidget, Logger):
         self.stop_button = QPushButton()
         self.switch_button = QPushButton()
 
-        self.table = {"firm": QTableWidget(),
-                      "customer": QTableWidget()}
-
         self.trial_counter = TrialCounter()
 
         self.address_label = QLabel()
 
         self.plot_layout = dict()
+        self.table_layout = dict()
 
         self.plot_layout["firm_profits"] = PlotLayout(
             parent=self,
@@ -60,14 +59,19 @@ class GameFrame(QWidget, Logger):
             plot_class=OneLinePlot
         )
 
+        self.table_layout["firm"] = TableLayout(
+            parent=self,
+            role="firm",
+            labels=self._get_labels(role="firm")
+        )
+
+        self.table_layout["customer"] = TableLayout(
+            parent=self,
+            role="customer",
+            labels=self._get_labels(role="customer")
+        )
+
         self.setup()
-
-    def set_address_type(self, server_name):
-
-        self.address_text = (
-                "IP: {}".format(self.param["network"]["ip_address"]), 
-                "Server url: {}".format(self.param["network"]["php_server"])
-            )[server_name == "PHPServer"]
 
     def setup(self):
 
@@ -82,7 +86,7 @@ class GameFrame(QWidget, Logger):
             widget.hide()
 
         # add tables
-        for widget in self.table.values():
+        for key, widget in sorted(self.table_layout.items()):
             self.layout.addWidget(widget)
 
         self.layout.addWidget(self.stop_button, stretch=0, alignment=Qt.AlignBottom)
@@ -94,6 +98,9 @@ class GameFrame(QWidget, Logger):
         self.stop_button.clicked.connect(self.push_stop_button)
         # noinspection PyUnresolvedReferences
         self.switch_button.clicked.connect(self.push_switch_button)
+
+    def set_server_address(self, address):
+        self.address_text = address
 
     def prepare(self, parameters):
 
@@ -114,6 +121,10 @@ class GameFrame(QWidget, Logger):
     def prepare_figures(self):
 
         self.initialize_figures()
+
+    def prepare_tables(self, parameters):
+
+        self.initialize_tables(parameters)
 
     def prepare_buttons(self):
 
@@ -161,112 +172,26 @@ class GameFrame(QWidget, Logger):
 
         self.trial_counter.set_trial_number(trial_n)
 
-    def prepare_tables(self, parameters):
+    def initialize_tables(self, parameters):
 
-        assignment, ids, labels, fancy_labels = self.get_tables_data(parameters)
-
-        for role in ["firm", "customer"]:
-
-            rows = [server_id for server_id, j, k in assignment if j == role]
-
-            columns = fancy_labels[role]
-
-            # empty tables
-            self.table[role].clear()
-
-            # set non editable and disable selection
-            self.table[role].setEditTriggers(QAbstractItemView.NoEditTriggers)
-            self.table[role].setSelectionMode(QAbstractItemView.NoSelection)
-            self.table[role].setFocusPolicy(Qt.NoFocus)
-
-            # set height and width
-            self.table[role].setColumnCount(len(columns))
-            self.table[role].setRowCount(len(rows))
-
-            # fit the widget
-            self.table[role].horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            self.table[role].verticalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-            # set column names (parameters to print)
-            for i, param in enumerate(columns):
-                self.table[role].setHorizontalHeaderItem(i, QTableWidgetItem(param))
-
-            # set rows names (server ids, then game ids)
-            for i, idx in enumerate(rows):
-                self.table[role].setVerticalHeaderItem(
-                    i, QTableWidgetItem("Server id: {}".format(idx))
-                )
-
-    def update_tables(self, parameters):
-
-        assignment, ids, labels, fancy_labels = self.get_tables_data(parameters)
-
-        for role in ["firm", "customer"]:
-
-            rows = ids[role]
-            columns = labels[role]
-
-            # set row names (server ids, game ids)
-            for i, idx in enumerate(rows):
-                    self.table[role].setVerticalHeaderItem(
-                        i, QTableWidgetItem("Server id: {} | Game id: {}".format(*idx))   
-                    )
-
-            self.fill_tables(role, rows, columns, parameters)
-
-    def fill_tables(self, role, rows, columns, parameters):
-
-        # for each game_id
-        for x, (server_id, game_id) in enumerate(rows):
-
-            # for each label
-            for y, label in enumerate(columns):
-
-                data = parameters["current_state"][label]
-                cond = game_id in parameters["{}s_id".format(role)].keys()
-
-                if cond:
-                    role_id = parameters["{}s_id".format(role)][game_id]
-
-                    # if data is available
-                    if len(data) > int(role_id):
-                        string = str(data[role_id])
-                        self.table[role].setItem(x, y, QTableWidgetItem(string))
-
-    def get_tables_data(self, parameters):
-
-        ids = self.get_ids(parameters)
-        labels, fancy_labels = self.get_labels()
-        assignment = parameters["assignment"]
-
-        return assignment, ids, labels, fancy_labels
+        for key, table in self.table_layout.items():
+            table.prepare(
+                rows=[name for name, role, bot in parameters["assignment"] if role == key]
+            )
 
     @staticmethod
-    def get_ids(parameters):
+    def _get_ids(parameters):
+        
+        firm_id = list(parameters["firms_id"].keys())
+        customer_id = list(parameters["customers_id"].keys())
 
-        server_id = list(parameters["map_server_id_game_id"].items())
-        bot_firm_id = list(parameters["bot_firms_id"].items())
-        bot_customer_id = list(parameters["bot_customers_id"].items())
-
-        add = bot_firm_id + bot_customer_id
-
-        bot_game_id = [("Bot", game_id) for game_id, i in add]
-
-        server_id_game_id = server_id + bot_game_id
-
-        ids = {"firm": [],
-               "customer": []}
-
-        # sort server ids and game ids by role (firm vs customer)
-        for role in ["firm", "customer"]:
-            ids[role] = [
-                (server_id, game_id) for server_id, game_id in server_id_game_id
-                if parameters["roles"][game_id] == role
-            ]
+        ids = {"firm": sorted(firm_id),
+               "customer": sorted(customer_id)}
+        
         return ids
 
     @staticmethod
-    def get_labels():
+    def _get_labels(role):
 
         # pick desired labels
         firm_labels = ("firm_profits",
@@ -298,7 +223,18 @@ class GameFrame(QWidget, Logger):
                 name.replace("_", " ").capitalize()
                 for name in customer_labels]}
 
-        return labels, fancy_labels
+        return {"labels": labels[role], 
+                "fancy_labels": fancy_labels[role]}
+
+    def update_tables(self, parameters):
+        
+        ids = self._get_ids(parameters)
+
+        for role in self.table_layout.keys():
+
+            if not self.table_layout[role].isHidden():
+
+                self.table_layout[role].update(ids[role], parameters)
 
     def initialize_figures(self):
 

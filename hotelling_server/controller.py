@@ -188,11 +188,12 @@ class Controller(Thread, Logger):
         self.log("Server's class: {}".format(server_class))
         self.server = server_class(controller=self)
         self.server_queue = self.server.queue
-        self.ask_interface("set_server_class", server_class)
+        self.ask_interface("set_server_class_parametrization_frame", server_class)
     
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param))
         self.server.setup(param)
+        self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
         self.log("Setting game assignement from interface: {}".format(assignment))

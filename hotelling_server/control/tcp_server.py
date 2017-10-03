@@ -58,7 +58,6 @@ class TCPGamingServer(Logger, socketserver.TCPServer):
         self.server_queue = server_queue
         self.cont = cont
         self.controller_queue = controller_queue
-        self.ip = server_address[0]
         self.parent = parent
 
         super().__init__(server_address, HttpHandler)  # TCPHandler)
@@ -73,7 +72,6 @@ class TCPServer(Thread, Logger):
         Thread.__init__(self)
 
         self.cont = controller
-        self.param = self.cont.get_parameters("network")
 
         self.controller_queue = self.cont.queue
         self.queue = Queue()
@@ -82,13 +80,23 @@ class TCPServer(Thread, Logger):
 
         self.shutdown_event = Event()
         self.wait_event = Event()
-        # self.wait_condition = Condition()
-
+        
         self.tcp_server = None
+        self.param = None
+        self.server_address = None
 
         self.timer = Timer(self, 1, self.check_all_client_time_since_last_request)
 
         self.timer.start()
+
+    def setup(self, param):
+
+        self.param = param
+
+        if self.param["network"]["local"]:
+            self.server_address = "localhost"
+        else:
+            self.server_address = self.param["network"]["ip_address"]
 
     def run(self):
 
@@ -100,16 +108,11 @@ class TCPServer(Thread, Logger):
 
             if msg and msg[0] == "Go":
 
-                if self.param["local"]:
-                    ip_address = "localhost"
-                else:
-                    ip_address = self.param["ip_address"]
-
-                self.log("Try to connect using ip {}...".format(ip_address))
+                self.log("Try to connect using ip {}...".format(self.server_address))
 
                 self.tcp_server = TCPGamingServer(
                     parent=self,
-                    server_address=(ip_address, self.param["port"]),
+                    server_address=(self.server_address, self.param["network"]["port"]),
                     cont=self.cont,
                     controller_queue=self.controller_queue,
                     server_queue=self.queue

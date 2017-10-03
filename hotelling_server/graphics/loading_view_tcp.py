@@ -38,8 +38,7 @@ class LoadGameNewGameFrameTCP(QWidget, Logger):
         self.widgets["ip_address"] = QLineEdit()
         
         # Do ugly things to get the right alignment for each widget
-        for i, (label, widget) in sorted(enumerate(self.widgets.items())):
-
+        for i, (label, widget) in sorted(enumerate(self.widgets.items())): 
             grid_layout.addWidget(QLabel(label), i, 0, alignment=Qt.AlignLeft)
 
             if label == "localhost":
