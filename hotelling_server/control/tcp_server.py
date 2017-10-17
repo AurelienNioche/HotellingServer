@@ -152,9 +152,9 @@ class TCPServer(Thread, Logger):
             time_now = time.time()
             time_since_last_request = int(time_now - client_time)
 
-            self.update_client_time_on_interface(ip=client_ip, time_diff=time_since_last_request)
+            self.update_time(ip=client_ip, time_diff=time_since_last_request)
 
-    def update_client_time_on_interface(self, ip, time_diff):
+    def update_time(self, ip, time_diff):
 
         game_id = self.clients[ip]["game_id"]
         role = self.cont.data.roles[game_id]
@@ -167,11 +167,13 @@ class TCPServer(Thread, Logger):
         elif role == "firm":
             if game_id in self.cont.data.firms_id.keys():
                 role_id = self.cont.data.firms_id[game_id]
-        if role_id is not None:
-            self.update_time(role=role, role_id=role_id, time_diff=time_diff)
 
-    def update_time(self, role, role_id, time_diff):
-        self.cont.data.current_state["time_since_last_request_{}s".format(role)][role_id] = str(time_diff)
+        if role_id is not None:
+
+            self.update_client_time_on_interface((role, role_id, time_diff))
+
+    def update_client_time_on_interface(self, args):
+        self.controller_queue.put(("server_update_client_time_on_interface", args))
 
 
 class Timer(Thread):

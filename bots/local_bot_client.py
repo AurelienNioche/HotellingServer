@@ -51,7 +51,7 @@ class HotellingLocalBots(Logger, Thread):
         # start to init bots
         self.init()
 
-        self.log("Local Bots: Game is starting.")
+        self.log("Game is starting.")
 
         while True:
 
@@ -77,7 +77,7 @@ class HotellingLocalBots(Logger, Thread):
                     or self.stopped() or not self.controller.running_game.is_set():
 
                     self.set_bots_to_end_state()
-                    self.log("Local Bots: Game ends, bots are going to shutdown!")
+                    self.log("Game ends, bots are going to shutdown.")
 
                     break
 

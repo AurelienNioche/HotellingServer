@@ -2,7 +2,8 @@ from multiprocessing import Queue, Event
 from threading import Thread
 
 from utils.utils import Logger
-from hotelling_server.control import backup, data, game, php_server, tcp_server, statistician, id_manager, time_manager
+from hotelling_server.control import backup, data, game, statistician, \
+        id_manager, time_manager
 
 
 class Controller(Thread, Logger):
@@ -49,7 +50,7 @@ class Controller(Thread, Logger):
 
         # Send previous params to UI
         self.ask_interface("set_previous_parameters", self.data.param)
-        
+
         # Prepares ui frames
         self.ask_interface("prepare_frames")
 
@@ -95,7 +96,6 @@ class Controller(Thread, Logger):
         self.log("Close program.")
         self.running_game.set()
 
-        # For aborting launching of the (properly speaking) 
         # server if it was not launched
         self.server_queue.put(("Abort",))
         self.server.shutdown()
@@ -181,6 +181,15 @@ class Controller(Thread, Logger):
         else:
             response = self.game.handle_request(server_data)
             self.server_queue.put(("reply", response))
+
+    def server_update_client_time_on_interface(self, args):
+        """
+        param 0: role
+        param 1: role_id
+        param 2: time since last request
+        """
+        self.data.current_state["time_since_last_request_{}s".format(
+            args[0])][args[1]] = str(args[2])
    
     # ------------------------------ UI interface  -------------------------------------------#
 

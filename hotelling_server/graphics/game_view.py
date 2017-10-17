@@ -71,9 +71,9 @@ class GameFrame(QWidget, Logger):
             labels=self._get_labels(role="customer")
         )
 
-        self.setup()
+        self._setup()
 
-    def setup(self):
+    def _setup(self):
 
         self.setLayout(self.layout)
         self.layout.addLayout(self.trial_counter, stretch=0)
@@ -105,28 +105,28 @@ class GameFrame(QWidget, Logger):
     def prepare(self, parameters):
 
         self.log("Preparing...")
-        self.prepare_figures()
-        self.prepare_buttons()
-        self.prepare_tables(parameters)
-        self.prepare_address_label()
+        self._prepare_figures()
+        self._prepare_buttons()
+        self._prepare_tables(parameters)
+        self._prepare_address_label()
         self.log("Preparation done!")
 
-    def prepare_address_label(self):
+    def _prepare_address_label(self):
         
         self.address_label.setText(self.address_text)
         font = QFont()
         font.setPointSize(20)
         self.address_label.setFont(font)
 
-    def prepare_figures(self):
+    def _prepare_figures(self):
 
-        self.initialize_figures()
+        self._initialize_figures()
 
-    def prepare_tables(self, parameters):
+    def _prepare_tables(self, parameters):
 
-        self.initialize_tables(parameters)
+        self._initialize_tables(parameters)
 
-    def prepare_buttons(self):
+    def _prepare_buttons(self):
 
         self.stop_button.setText("Stop task")
         self.stop_button.setEnabled(True)
@@ -139,15 +139,15 @@ class GameFrame(QWidget, Logger):
         switch = self.switch_button.text() == "View figures"
         self.switch_button.setText(("View figures", "View tables")[switch])
 
-        to_hide = (self.plot_layout, self.table)[switch]
-        to_show = (self.table, self.plot_layout)[switch]
+        to_hide = (self.plot_layout, self.table_layout)[switch]
+        to_show = (self.table_layout, self.plot_layout)[switch]
 
-        self.hide_and_show(to_hide=to_hide, to_show=to_show)
+        self._hide_and_show(to_hide=to_hide, to_show=to_show)
 
         self.switch_button.setEnabled(True)
 
     @staticmethod
-    def hide_and_show(to_hide, to_show):
+    def _hide_and_show(to_hide, to_show):
 
         for widget in to_hide.values():
             widget.hide()
@@ -172,12 +172,14 @@ class GameFrame(QWidget, Logger):
 
         self.trial_counter.set_trial_number(trial_n)
 
-    def initialize_tables(self, parameters):
+    def _initialize_tables(self, parameters):
 
         for key, table in self.table_layout.items():
             table.prepare(
                 rows=[name for name, role, bot in parameters["assignment"] if role == key]
             )
+
+    # -------------------------------------- These methods need to be moved elsewhere ------------------------- # 
 
     @staticmethod
     def _get_ids(parameters):
@@ -226,6 +228,8 @@ class GameFrame(QWidget, Logger):
         return {"labels": labels[role], 
                 "fancy_labels": fancy_labels[role]}
 
+    # ----------------------------------------------------------------------------------------------- # 
+
     def update_tables(self, parameters):
         
         ids = self._get_ids(parameters)
@@ -236,7 +240,7 @@ class GameFrame(QWidget, Logger):
 
                 self.table_layout[role].update(ids[role], parameters)
 
-    def initialize_figures(self):
+    def _initialize_figures(self):
 
         for widget in self.plot_layout.values():
             widget.plot.clear()

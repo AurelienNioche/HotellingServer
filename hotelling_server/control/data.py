@@ -41,8 +41,6 @@ class Data(Logger):
         self.time_manager_ending_t = None
         self.continue_game = True
 
-        self.assignment_tcp = {}
-        self.assignment_php = {}
         self.assignment = {}
 
         self.parametrization = {}
@@ -108,8 +106,7 @@ class Data(Logger):
                 "time_manager_ending_t": self.controller.time_manager.ending_t,
                 "continue": self.controller.time_manager.continue_game,
                 "time_manager_state": self.controller.time_manager.state,
-                "assignment_tcp": self.assignment_tcp,
-                "assignment_php": self.assignment_php,
+                "assignment": self.assignment,
                 "parametrization": self.parametrization
             }
         )
@@ -135,8 +132,7 @@ class Data(Logger):
         self.time_manager_t = data["time_manager_t"]
         self.time_manager_ending_t = data["time_manager_ending_t"]
         self.continue_game = data["continue"]
-        self.assignment_tcp = data["assignment_tcp"]
-        self.assignment_php = data["assignment_php"]
+        self.assignment = data["assignment"]
         self.parametrization = data["parametrization"]
 
     def update_history(self):
