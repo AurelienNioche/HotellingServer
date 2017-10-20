@@ -349,8 +349,7 @@ class Game(Logger):
         # Suppress the 'role' arg in the response.
         # As well as game_id. 
         args = rep["response"].split("/")
-        args.pop(1)  # 1 is the index of game_id
-        args.pop(2)  # 2 is the index of the 'role' arg.
+        args.pop(3)  # 3 is the index of the 'role' arg.
 
         without_role_args = "/".join(args)
 
@@ -375,7 +374,7 @@ class Game(Logger):
 
         return self.reply(
             game_id,
-            func_name, game_id, self.time_manager.t, role, position, exploration_cost,
+            func_name, self.time_manager.t, role, position, exploration_cost,
             utility_consumption, utility)
 
     def get_customers_data(self, customer_id):
@@ -403,7 +402,7 @@ class Game(Logger):
 
         self.set_state(role="firm", role_id=firm_id, state=function_name())
 
-        return self.reply(game_id, func_name, game_id, self.time_manager.t, 
+        return self.reply(game_id, func_name, self.time_manager.t,
             role, position, state, price, opp_position, opp_price, profits)
 
     def get_firms_data(self, firm_id):
