@@ -30,8 +30,10 @@ class HttpHandler(http.server.SimpleHTTPRequestHandler, Logger):
 
         else:
             response = "Request is empty."
+
         try:
             self.server.parent.check_client_connection(self.client_address[0], response)
+
         except Exception as err:
             self.log("Error during connection checking: {}".format(err))
 
@@ -56,7 +58,6 @@ class TCPGamingServer(Logger, socketserver.TCPServer):
 
     def __init__(self, parent, server_address, cont, controller_queue, server_queue):
         self.server_queue = server_queue
-        self.cont = cont
         self.controller_queue = controller_queue
         self.parent = parent
 
@@ -85,7 +86,7 @@ class TCPServer(Thread, Logger):
         self.param = None
         self.server_address = None
 
-        self.timer = Timer(self, 1, self.check_all_client_time_since_last_request)
+        self.timer = Timer(parent=self, wait=1, func=self.check_all_client_time_since_last_request)
 
         self.timer.start()
 

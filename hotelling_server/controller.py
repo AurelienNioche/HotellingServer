@@ -61,7 +61,7 @@ class Controller(Thread, Logger):
 
         while not self.shutdown.is_set():
 
-            self.log("Waiting for a message.")
+            self.log("Waiting for a message.", level=1)
             message = self.queue.get()
             self.handle_message(message)
 
@@ -246,9 +246,8 @@ class Controller(Thread, Logger):
     def ui_update_game_view_data(self):
 
         if self.running_game.is_set():
-
             self.log("UI asks 'update data'.")
-            self.ask_interface("update_tables", self.get_current_data())
+            sulf.ask_interface("update_tables", self.get_current_data())
             self.ask_interface("update_figures", self.get_current_data())
 
     def ui_stop_bots(self):
@@ -277,11 +276,9 @@ class Controller(Thread, Logger):
 
         potential_participants = self.server.get_waiting_list()
 
-        self.server.ask_for_erasing_tables()
-        
         # add self.data.n_agents?
         participants = \
-            potential_participants[:self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]]
+            potential_participants[:self.data.n_agents]
 
         roles = [i[1] for i in self.data.assignment if i[2] is False]  # Order is 'name', 'role', 'bot'
         # Why not -> [role for name, role, bot in self.data.assignement if not bot]?
@@ -313,6 +310,10 @@ class Controller(Thread, Logger):
             participants = waiting_list[:n_player]
 
         self.ask_interface("update_participants", participants)
+
+    def ui_php_erase_sql_tables(self, tables):
+
+        self.server.ask_for_erasing_tables(tables)
     
     # ------------------------------ Time Manager interface ------------------------------------ #
 

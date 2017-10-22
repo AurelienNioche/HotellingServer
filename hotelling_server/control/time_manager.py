@@ -85,7 +85,7 @@ class TimeManager(Logger):
             self.log("This turn is going to be the last one!")
             self.ending_t = self.t
 
-        # Ending time is defined and all clients got it (if it's works correctly)
+        # Ending time is defined and all clients got it
         elif not self.continue_game and self.ending_t:
             self.log("GAME ENDS NOW.")
             self.state = "end_game"

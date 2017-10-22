@@ -50,7 +50,7 @@ class AssignmentFrameTCP(Logger, QWidget):
         old_assign = self.param["assignment_tcp"]
 
         if len(old_assign) != len(self.parameters["assign"]):
-            self.show_warning(msg="assignment_tcp.json not matching game.json config file!")
+            # self.show_warning(msg="assignment_tcp.json not matching game.json config file!")
             self.new_setup(n_agents, roles)
         else:
             self.load_setup(old_assign)
@@ -92,6 +92,12 @@ class AssignmentFrameTCP(Logger, QWidget):
         self.layout.addLayout(horizontal_layout)
 
         self.setLayout(self.layout)
+
+    def prepare(self):
+
+        self.setFocus()
+        self.next_button.setFocus()
+        self.next_button.setEnabled(True)
 
     def load_setup(self, assignment):
 
@@ -191,13 +197,8 @@ class AssignmentFrameTCP(Logger, QWidget):
         line_edit.setText(name)
         line_edit.setStyleSheet("")
         line_edit.setFocus(True)
-
-    def prepare(self):
-
-        self.setFocus()
-        self.next_button.setFocus()
-        self.next_button.setEnabled(True)
-
+        
+        
         # --------------------------------- Widgets used in assignment menu --------------------------------- #
 
 

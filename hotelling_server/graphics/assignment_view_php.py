@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt, QObject, QEvent
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
-    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QMessageBox
+    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QMessageBox, QFormLayout, QDialog
 
 from utils.utils import Logger
 import warnings
@@ -21,12 +21,24 @@ class AssignmentFramePHP(Logger, QWidget):
         self.next_button = QPushButton("Next")
         self.previous_button = QPushButton("Previous")
         self.scan_button = QPushButton("Look for new participants...")
+        self.erase_sql_tables_button = QPushButton("Erase tables...")
+
+        # Window popping to erase sql tables
+        self.erase_sql_tables_window = QDialog(self)
+        self.erase_sql_tables_window.setLayout(QVBoxLayout())
+        self.erase_sql_tables_window.setWindowTitle("Erase tables")
+        self.cancel_button = QPushButton("Cancel")
+        self.ok_button = QPushButton("Ok")
+        self.tables_check_boxes = {}
+        self.form_layout = QFormLayout()
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
         self.group.addButton(self.scan_button)
+        self.group.addButton(self.erase_sql_tables_button)
+
 
         self.parameters = dict()
 
@@ -56,12 +68,20 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.fill_layout(labels, n_agents)
 
+        self.fill_erase_sql_tables_window(self.param["sql_tables"]["table_names"])
+
         # noinspection PyUnresolvedReferences
         self.next_button.clicked.connect(self.push_next_button)
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
         # noinspection PyUnresolvedReferences
         self.scan_button.clicked.connect(self.push_scan_button)
+        # noinspection PyUnresolvedReferences
+        self.erase_sql_tables_button.clicked.connect(self.push_erase_sql_tables_button)
+        # noinspection PyUnresolvedReferences
+        self.ok_button.clicked.connect(self.push_ok_button)
+        # noinspection PyUnresolvedReferences
+        self.cancel_button.clicked.connect(self.push_cancel_button)
 
         self.setup_done = True
 
@@ -91,8 +111,15 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addLayout(horizontal_layout)
         
         self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.erase_sql_tables_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
+
+    def prepare(self):
+
+        self.next_button.setEnabled(True)
+        self.next_button.setFocus()
+        self.setFocus()
 
     def new_setup(self, n_agents, roles):
 
@@ -159,7 +186,7 @@ class AssignmentFramePHP(Logger, QWidget):
             for j, (other_id, other_role, other_bot) in assignment:
 
                 if other_id == server_id and other_id != "Bot" and i != j:
-                    return "Two identical inputs: '{}'.".format(server_id)
+                    return "Two identical ids: '{}'.".format(server_id)
 
     def get_parameters(self):
         return [[i.get_value(), j.get_value(), k.get_value()] for i, j, k in self.parameters["assign"]]
@@ -204,11 +231,51 @@ class AssignmentFramePHP(Logger, QWidget):
         line_edit.setStyleSheet("")
         line_edit.setFocus(True)
 
-    def prepare(self):
+        # --------------------------------- Erase Tables Window  --------------------------------- #
 
-        self.next_button.setEnabled(True)
-        self.next_button.setFocus()
-        self.setFocus()
+    def fill_erase_sql_tables_window(self, tables):
+        
+        for label in tables:
+            self.tables_check_boxes[label] = QCheckBox()
+            self.form_layout.addRow(QLabel(label), self.tables_check_boxes[label])
+
+        self.form_layout.setFormAlignment(Qt.AlignHCenter)
+
+        horizontal_layout = QHBoxLayout()
+
+        horizontal_layout.addWidget(self.ok_button, alignment=Qt.AlignRight)
+        horizontal_layout.addWidget(self.cancel_button, alignment=Qt.AlignRight)
+
+        self.erase_sql_tables_window.layout().addLayout(self.form_layout)
+        self.erase_sql_tables_window.layout().addLayout(horizontal_layout)
+
+    def push_erase_sql_tables_button(self):
+
+        self.erase_sql_tables_button.setEnabled(False)
+        
+        self.erase_sql_tables_window.show()
+
+        self.erase_sql_tables_button.setEnabled(True)
+
+    def push_cancel_button(self):
+
+        self.cancel_button.setEnabled(False)
+
+        self.erase_sql_tables_window.hide()
+
+        self.cancel_button.setEnabled(True)
+
+    def push_ok_button(self):
+
+        self.ok_button.setEnabled(False)
+
+        checked_tables = [k for k, v in self.tables_check_boxes.items() if v.isChecked()]
+
+        if len(checked_tables):
+            self.parent().php_erase_sql_tables(checked_tables)
+
+        self.erase_sql_tables_window.hide()
+        self.ok_button.setEnabled(True)
 
         # --------------------------------- Widgets used in assignment menu --------------------------------- #
 
@@ -261,7 +328,7 @@ class IntParameter(object):
                               border: 1px solid #B0B0B0;
                               border-radius: 2px;'''
 
-        self.filter = MouseClick(parent, idx)
+        self.filter = MouseClick(parent=parent, idx=idx)
         self.setup(value)
 
     def setup(self, value):

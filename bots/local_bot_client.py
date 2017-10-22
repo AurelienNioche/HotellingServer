@@ -35,6 +35,8 @@ class HotellingLocalBots(Logger, Thread):
         self.firm_attributes["n_prices"] = self.game_parameters["n_prices"]
 
     def run(self):
+        
+        self._stop_event.clear()
 
         while True:
 
@@ -73,7 +75,7 @@ class HotellingLocalBots(Logger, Thread):
 
             self.time_manager.check_state()
 
-            if self.time_manager.state == "end_game" or not self.controller.server.is_alive() \
+            if self.time_manager.state == "end_game" or self.controller.server.shutdown_event.is_set() \
                     or self.stopped() or not self.controller.running_game.is_set():
 
                     self.set_bots_to_end_state()

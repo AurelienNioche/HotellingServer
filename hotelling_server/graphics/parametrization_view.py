@@ -100,6 +100,7 @@ class ParametersFrame(QWidget, Logger):
             self.parent().save_parameters("parametrization", self.param["parametrization"])
             self.parent().set_parametrization(self.param["parametrization"])
 
+            # maybe one of those 2 methods: 
             # self.parent().tcp_run_game() / self.parent().php_run_game()
             self.show_frame_game()
 
@@ -112,6 +113,7 @@ class ParametersFrame(QWidget, Logger):
         else:
             self.log("Push 'previous' button.")
             
+            # maybe one of those 2 methods: 
             # self.parent().show_frame_assignement_tcp/php()
             self.show_frame_assignment()
 

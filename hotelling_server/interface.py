@@ -2,7 +2,7 @@ from multiprocessing import Queue, Event
 from subprocess import getoutput
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget, QMenuBar
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
         setting_up_view, assignment_view_tcp, assignment_view_php, devices_view
 from utils.utils import Logger
@@ -49,6 +49,13 @@ class UI(QWidget, Logger):
         self.settings = QSettings("HumanoidVsAndroid", "Duopoly")
 
         self.controller_queue = None
+
+
+    def prepare_menu_bar(self):
+
+        self.menu_bar = QMenuBar(self)
+        self.menu_bar.addMenu('File')
+        self.menu_bar.show()
 
     @property
     def dimensions(self):
@@ -103,7 +110,7 @@ class UI(QWidget, Logger):
         self.send_go_signal()
         self.communicate.signal.connect(self.look_for_msg)
 
-        self.check_update()
+        # self.check_update()
 
         # get saved geometry
         try: 
@@ -131,7 +138,7 @@ class UI(QWidget, Logger):
 
         self.frames["assign_php"] = \
             assignment_view_php.AssignmentFramePHP(parent=self,
-                param=self._get_parameters("game", "assignment_php"))
+                param=self._get_parameters("game", "assignment_php", "sql_tables"))
 
         self.frames["assign_tcp"] = \
             assignment_view_tcp.AssignmentFrameTCP(parent=self,
@@ -166,42 +173,42 @@ class UI(QWidget, Logger):
 
         self.setLayout(self.layout)
 
-    def check_update(self):
+    # def check_update(self):
 
-        self.log("I check for updates.")
+        # self.log("I check for updates.")
 
-        getoutput("git fetch")
+        # getoutput("git fetch")
 
-        git_msg = getoutput("git diff origin/{}".format(self.mod.git_branch))
+        # git_msg = getoutput("git diff origin/{}".format(self.mod.git_branch))
 
-        self.log("Git message is: '{}'".format(git_msg))
+        # self.log("Git message is: '{}'".format(git_msg))
 
-        if git_msg:
+        # if git_msg:
 
-            if self.show_question(
-                    "An update is available.",
-                    question="Do you want to update now?", yes="Yes", no="No", focus="Yes"):
+            # if self.show_question(
+                    # "An update is available.",
+                    # question="Do you want to update now?", yes="Yes", no="No", focus="Yes"):
 
-                git_output = getoutput("git pull")
-                self.log("User wants to update. Git message is: {}".format(git_output))
-                success = 0
+                # git_output = getoutput("git pull")
+                # self.log("User wants to update. Git message is: {}".format(git_output))
+                # success = 0
 
-                if "Updating" in git_output:
-                    success = 1
+                # if "Updating" in git_output:
+                    # success = 1
 
-                else:
-                    for msg in ["git stash", "git pull", "git stash pop"]:
-                        git_output = getoutput(msg)
-                        self.log("Command is '{}' Git message is: '{}'".format(msg, git_output))
+                # else:
+                    # for msg in ["git stash", "git pull", "git stash pop"]:
+                        # git_output = getoutput(msg)
+                        # self.log("Command is '{}' Git message is: '{}'".format(msg, git_output))
 
-                    if "Updating" in git_output:
-                        success = 1
+                    # if "Updating" in git_output:
+                        # success = 1
 
-                if success:
-                    self.show_info("Updated successfully. Modifications will be effective at the next restart.")
+                # if success:
+                    # self.show_info("Updated successfully. Modifications will be effective at the next restart.")
 
-                else:
-                    self.show_warning("An error occurred. No modifications have been done.")
+                # else:
+                    # self.show_warning("An error occurred. No modifications have been done.")
 
     def closeEvent(self, event):
 
@@ -257,7 +264,7 @@ class UI(QWidget, Logger):
             self.occupied.set()
 
             msg = self.queue.get()
-            self.log("I received message '{}'.".format(msg))
+            self.log("I received message '{}'.".format(msg), level=1)
 
             command = eval("self.{}".format(msg[0]))
             args = msg[1:]
@@ -532,6 +539,9 @@ class UI(QWidget, Logger):
 
     def php_scan_button(self):
         self.controller_queue.put(("ui_php_scan_button", ))
+
+    def php_erase_sql_tables(self, tables):
+        self.controller_queue.put(("ui_php_erase_sql_tables", tables))
 
     def php_run_game(self):
         self.controller_queue.put(("ui_php_run_game", ))

@@ -18,8 +18,10 @@ def get_local_ip():
 class Logger:
 
     name = "Logger"
+    debug = 0
 
     @classmethod
-    def log(cls, msg):
-
-        print("{} {}: {}".format(datetime.now().strftime("[%y/%m/%d %H:%M:%S:%f]"), cls.name, msg))
+    def log(cls, msg, level=0):
+        
+        if cls.debug == level:
+            print("{} {}: {}".format(datetime.now().strftime("[%y/%m/%d %H:%M:%S:%f]"), cls.name, msg))
