@@ -185,12 +185,11 @@ class Controller(Thread, Logger):
         # When game is launched
         elif "ask_init" in server_data:
             response = self.init.ask_init(server_data)
-            self.server_queue.put(("reply", response))
+            self.server_queue.put((response[0], response[1]))
 
         else:
             response = self.game.handle_request(server_data)
-            self.server_queue.put(("reply", response))
-
+            self.server_queue.put((response[0], response[1]))
 
     def server_update_client_time_on_interface(self, args):
         """
@@ -351,7 +350,7 @@ class Controller(Thread, Logger):
 
     # ------------------------------ Initialization interface ------------------------------------ #
 
-    def init_get_ids_from_client_name_tcp(self, client_name):
+    def init_get_ids_from_client_name_tcp(self, server_id, game_id):
 
         self.init.queue.put(*(server_id, game_id))
 

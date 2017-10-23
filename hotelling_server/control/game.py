@@ -128,7 +128,7 @@ class Game(Logger):
 
         # don't launch methods if init is not done
         if not self.data.current_state["init_done"]:
-            to_client = "error/wait_init"
+            to_client = self.reply_error("wait_init")
 
         # regular launch method
         else:
@@ -247,13 +247,17 @@ class Game(Logger):
         return self.controller.server.name == "PHPServer"
 
     def reply(self, *args):
+
         msg = {
             "game_id": args[0],
             "response": "reply/{}".format("/".join(
                 [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args[1:]]
             ))}
 
-        return msg if self.is_php() else msg["response"]
+        return ("reply", msg) if self.is_php() else ("reply", msg["response"])
+
+    def reply_error(self, msg):
+        return ("error", msg) if self.is_php() else ("reply", "error/{}".format(msg))
 
     def get_all_states(self):
         return self.data.current_state["firm_states"] + self.data.current_state["customer_states"]
@@ -285,10 +289,10 @@ class Game(Logger):
 
                 return self.reply(game_id, function_name(), self.time_manager.t, x[0], x[1], prices[0], prices[1])
             else:
-                return "error/wait"
+                return self.reply_error("wait")
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
             x = self.data.history["firm_positions"][t]
@@ -323,7 +327,7 @@ class Game(Logger):
             return out
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
             return self.reply(game_id, function_name(), t, self.check_end(t))
@@ -343,7 +347,8 @@ class Game(Logger):
             if self.time_manager.state == "active_has_played" or \
                     self.time_manager.state == "active_has_played_and_all_customers_replied":
 
-                out = self.reply(game_id, 
+                out = self.reply(
+                    game_id,
                     function_name(),
                     self.time_manager.t,
                     self.data.current_state["firm_positions"][opponent_id],
@@ -356,10 +361,10 @@ class Game(Logger):
                 return out
 
             else:
-                return "error/wait"
+                return self.reply_error("wait")
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
 
@@ -398,10 +403,10 @@ class Game(Logger):
                     return out
 
             else:
-                return "error/wait"
+                return self.reply_error("wait")
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
             choices = self.get_client_choices(firm_id, t)
@@ -432,7 +437,7 @@ class Game(Logger):
             return out
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
             return self.reply(game_id, function_name(), t)
@@ -463,10 +468,10 @@ class Game(Logger):
                 return out
 
             else:
-                return "error/wait"
+                return self.reply_error("wait")
 
         elif t > self.time_manager.t:
-            return "error/time_is_superior"
+            return self.reply_error("time_is_superior")
 
         else:
             choices = self.get_client_choices(firm_id, t)

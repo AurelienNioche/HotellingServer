@@ -102,7 +102,7 @@ class PHPServer(Thread, Logger):
 
         while not self.wait_event.is_set():
 
-            try:
+            # try:
 
                 data = {"demand_type": "reading", "table": "request"}
                 response = rq.get(self.server_address, params=data)
@@ -117,9 +117,9 @@ class PHPServer(Thread, Logger):
 
                         self.log("I will treat {} request(s).".format(len(requests)))
                         self.treat_requests(n_requests=len(requests))
-
-            except Exception as e:
-                self.log("Got error '{}'.".format(e))
+            #
+            # except Exception as e:
+            #     self.log("Got error '{}'.".format(e))
                 
     def treat_requests(self, n_requests):
 
@@ -141,6 +141,10 @@ class PHPServer(Thread, Logger):
                 response = rq.get(self.server_address, params=data)
 
                 self.log("Response from distant server is: '{}'.".format(response.text))
+
+            elif should_be_reply == "error":
+
+                self.log("I will not send response now (code error is '{}').".format(response))
 
             else:
                 raise Exception("Something went wrong...")

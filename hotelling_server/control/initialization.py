@@ -1,11 +1,8 @@
-from multiprocessing import Queue, Event
-from threading import Thread
+from multiprocessing import Queue
 import numpy as np
 
-from utils.utils import function_name
 
-
-class Init(Thread):
+class Init:
 
     name = "Init"
 
@@ -18,6 +15,8 @@ class Init(Thread):
 
         self.server_class = None
         self.assignment = None
+        self.reply = None
+        self.ask_init = None
 
         self.queue = Queue()
 
@@ -89,7 +88,8 @@ class Init(Thread):
 
         self.check_remaining_agents()
 
-        return self.reply(game_id, func_name, self.time_manager.t, role, position, exploration_cost,
+        return self.reply(
+            game_id, func_name, self.time_manager.t, role, position, exploration_cost,
             utility_consumption, utility)
 
     def init_customers_php(self, func_name, game_id, role):
@@ -105,14 +105,15 @@ class Init(Thread):
 
         self.check_remaining_agents()
 
-        return self.reply(game_id, func_name, self.time_manager.t, position, exploration_cost,
+        return self.reply(
+            game_id, func_name, self.time_manager.t, position, exploration_cost,
             utility_consumption, utility)
 
     def get_customers_data(self, customer_id):
 
         position = customer_id + 1
-        exploration_cost = self.interface_parameters["exploration_cost"]
-        utility_consumption = self.interface_parameters["utility_consumption"]
+        exploration_cost = self.data.parametrization["exploration_cost"]
+        utility_consumption = self.data.parametrization["utility_consumption"]
         utility = self.data.current_state["customer_cumulative_utility"][customer_id]
 
         return position, exploration_cost, utility_consumption, utility
@@ -148,7 +149,8 @@ class Init(Thread):
 
         self.check_remaining_agents()
 
-        return self.reply(game_id, func_name, self.time_manager.t,
+        return self.reply(
+            game_id, func_name, self.time_manager.t,
             position, state, price, opp_position, opp_price, profits)
 
     def get_firms_data(self, firm_id):
@@ -167,17 +169,22 @@ class Init(Thread):
     
     @staticmethod
     def reply_tcp(*args):
-        return "reply/{}".format(
-            "/".join([str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args]))
+
+        return ("reply",
+                "reply/{}".format(
+                    "/".join(
+                        [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args]))
+                )
 
     @staticmethod
     def reply_php(*args):
+
         msg = {
             "game_id": args[0],
             "response": "reply/{}".format("/".join(
                 [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args[1:]]
             ))}
-        return msg 
+        return "reply", msg
 
     def get_role(self, server_id):
 
@@ -186,13 +193,13 @@ class Init(Thread):
                 return role
 
         # in case of no matching id
-        if server_id not in self.unexpected_id_list:
+        if server_id not in self.data.unexpected_id_list:
             self.unexpected_client_id(server_id)
         
     def unexpected_client_id(self, server_id):
 
         self.controller.ask_interface("unexpected_client_id", server_id)
-        self.unexpected_id_list.append(server_id)
+        self.data.unexpected_id_list.append(server_id)
 
     def check_remaining_agents(self):
 
