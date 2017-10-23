@@ -35,6 +35,8 @@ class HotellingLocalBots(Logger, Thread):
         self.firm_attributes["n_prices"] = self.game_parameters["n_prices"]
 
     def run(self):
+        
+        self._stop_event.clear()
 
         while True:
 
@@ -73,7 +75,7 @@ class HotellingLocalBots(Logger, Thread):
 
             self.time_manager.check_state()
 
-            if self.time_manager.state == "end_game" or not self.controller.server.is_alive() \
+            if self.time_manager.state == "end_game" or self.controller.server.shutdown_event.is_set() \
                     or self.stopped() or not self.controller.running_game.is_set():
 
                     self.set_bots_to_end_state()
@@ -106,36 +108,35 @@ class HotellingLocalBots(Logger, Thread):
 
     def init(self):
 
-        for i in range(self.n_customers):
+        for game_id, server_id, role, bot in self.data.assignment:                
 
-            game_id = self.n_agents_to_wait
+            if bot and role == "customer":
 
-            self.n_agents_to_wait += 1
+                self.n_agents_to_wait += 1
 
-            customer_id = len(self.data.customers_id)
+                customer_id = len(self.data.customers_id)
 
-            if game_id not in self.data.customers_id.keys():
+                if game_id not in self.data.customers_id.keys():
 
-                self.data.customers_id[game_id] = customer_id
-                self.data.bot_customers_id[game_id] = customer_id
+                    self.data.customers_id[game_id] = customer_id
+                    self.data.bot_customers_id[game_id] = customer_id
 
-                self.data.roles[game_id] = "customer"
-                self.data.current_state["time_since_last_request_customers"][customer_id] = " ✔ "
+                    self.data.roles[game_id] = "customer"
+                    self.data.current_state["time_since_last_request_customers"][customer_id] = " ✔ "
 
-        for i in range(self.n_firms):
+            if bot and role == "firm":
 
-            firm_id = len(self.data.firms_id)
-            game_id = self.n_agents_to_wait
+                firm_id = len(self.data.firms_id)
 
-            self.n_agents_to_wait += 1
+                self.n_agents_to_wait += 1
 
-            if game_id not in self.data.firms_id.keys():
+                if game_id not in self.data.firms_id.keys():
 
-                self.data.firms_id[game_id] = firm_id
-                self.data.bot_firms_id[game_id] = firm_id
+                    self.data.firms_id[game_id] = firm_id
+                    self.data.bot_firms_id[game_id] = firm_id
 
-                self.data.roles[game_id] = "firm"
-                self.data.current_state["time_since_last_request_firms"][firm_id] = " ✔ "
+                    self.data.roles[game_id] = "firm"
+                    self.data.current_state["time_since_last_request_firms"][firm_id] = " ✔ "
 
         self.check_remaining_agents()
 

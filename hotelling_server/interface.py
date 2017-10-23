@@ -2,9 +2,11 @@ from multiprocessing import Queue, Event
 from subprocess import getoutput
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget, QMenuBar
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
-        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view
+        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
+        erase_sql_tables_view
+
 from utils.utils import Logger
 
 
@@ -28,6 +30,7 @@ class UI(QWidget, Logger):
         self.layout = QVBoxLayout()
 
         self.frames = dict()
+        self.menubar_frames = dict()
 
         self.param = dict()
         self.old_param = dict()
@@ -49,6 +52,8 @@ class UI(QWidget, Logger):
         self.settings = QSettings("HumanoidVsAndroid", "Duopoly")
 
         self.controller_queue = None
+
+        self.menubar = menubar.MenuBar(parent=self)
 
     @property
     def dimensions(self):
@@ -82,9 +87,10 @@ class UI(QWidget, Logger):
 
         self.frames["game"].set_server_address(address)
 
-    def _get_parameters(self, *keys):
-        """get selected params in order to pass them to view's constructors"""
-        return {k: v for k, v in self.param.items() if k in keys}
+    def set_assignment_game_frame(self, assignment):
+        """Set assignment displayed in game view rows"""
+
+        self.frames["game"].set_assignment(assignment)
 
     def stop_scanning_network(self):
 
@@ -94,8 +100,15 @@ class UI(QWidget, Logger):
     def update_participants(self, participants):
         self.frames["assign_php"].update_participants(participants)
 
+    # ----------------- called by views methods -------------------------------------------------------- # 
     def save_parameters(self, key, data):
         self.param[key] = data
+
+    # -------------------------------------------------------------------------------------------------- # 
+
+    def _get_parameters(self, *keys):
+        """get selected params in order to pass them to view's constructors"""
+        return {k: v for k, v in self.param.items() if k in keys}
 
     def setup(self):
 
@@ -103,7 +116,7 @@ class UI(QWidget, Logger):
         self.send_go_signal()
         self.communicate.signal.connect(self.look_for_msg)
 
-        self.check_update()
+        # self.check_update()
 
         # get saved geometry
         try: 
@@ -114,6 +127,7 @@ class UI(QWidget, Logger):
 
     def prepare_frames(self): 
 
+        # ------------------- Main window frames ---------------------------- # 
         self.frames["start"] = \
             start_view.StartFrame(parent=self)
 
@@ -131,7 +145,7 @@ class UI(QWidget, Logger):
 
         self.frames["assign_php"] = \
             assignment_view_php.AssignmentFramePHP(parent=self,
-                param=self._get_parameters("game", "assignment_php"))
+                param=self._get_parameters("game", "assignment_php", "sql_tables"))
 
         self.frames["assign_tcp"] = \
             assignment_view_tcp.AssignmentFrameTCP(parent=self,
@@ -148,7 +162,19 @@ class UI(QWidget, Logger):
         self.frames["setting_up"] = \
             setting_up_view.SettingUpFrame(parent=self)
 
-        # --------------------------------------------------- # 
+        # ------------------- Menu bar frames ---------------------------- # 
+
+        self.menubar_frames["config_files"] = \
+                config_files_view.ConfigFilesWindow(parent=self,
+                param=self._get_parameters("parametrization", "network", "game", "sql_tables", "folders"))
+
+        self.menubar_frames["erase_sql_tables"] = \
+                erase_sql_tables_view.EraseSQLTablesFrame(parent=self,
+                param=self._get_parameters("sql_tables"))
+
+        # ---------------------------------------------------------------- # 
+    
+    def prepare_window(self):
 
         self.setWindowTitle(self.app_name)
 
@@ -162,46 +188,47 @@ class UI(QWidget, Logger):
             grid.addWidget(frame, 0, 0)
 
         grid.setAlignment(Qt.AlignCenter)
+
         self.layout.addLayout(grid, stretch=1)
 
         self.setLayout(self.layout)
 
-    def check_update(self):
+    # def check_update(self):
 
-        self.log("I check for updates.")
+        # self.log("I check for updates.")
 
-        getoutput("git fetch")
+        # getoutput("git fetch")
 
-        git_msg = getoutput("git diff origin/{}".format(self.mod.git_branch))
+        # git_msg = getoutput("git diff origin/{}".format(self.mod.git_branch))
 
-        self.log("Git message is: '{}'".format(git_msg))
+        # self.log("Git message is: '{}'".format(git_msg))
 
-        if git_msg:
+        # if git_msg:
 
-            if self.show_question(
-                    "An update is available.",
-                    question="Do you want to update now?", yes="Yes", no="No", focus="Yes"):
+            # if self.show_question(
+                    # "An update is available.",
+                    # question="Do you want to update now?", yes="Yes", no="No", focus="Yes"):
 
-                git_output = getoutput("git pull")
-                self.log("User wants to update. Git message is: {}".format(git_output))
-                success = 0
+                # git_output = getoutput("git pull")
+                # self.log("User wants to update. Git message is: {}".format(git_output))
+                # success = 0
 
-                if "Updating" in git_output:
-                    success = 1
+                # if "Updating" in git_output:
+                    # success = 1
 
-                else:
-                    for msg in ["git stash", "git pull", "git stash pop"]:
-                        git_output = getoutput(msg)
-                        self.log("Command is '{}' Git message is: '{}'".format(msg, git_output))
+                # else:
+                    # for msg in ["git stash", "git pull", "git stash pop"]:
+                        # git_output = getoutput(msg)
+                        # self.log("Command is '{}' Git message is: '{}'".format(msg, git_output))
 
-                    if "Updating" in git_output:
-                        success = 1
+                    # if "Updating" in git_output:
+                        # success = 1
 
-                if success:
-                    self.show_info("Updated successfully. Modifications will be effective at the next restart.")
+                # if success:
+                    # self.show_info("Updated successfully. Modifications will be effective at the next restart.")
 
-                else:
-                    self.show_warning("An error occurred. No modifications have been done.")
+                # else:
+                    # self.show_warning("An error occurred. No modifications have been done.")
 
     def closeEvent(self, event):
 
@@ -233,8 +260,11 @@ class UI(QWidget, Logger):
         if cond:
 
             if self.show_question("Do you want to save the change in parameters and assignment?"):
-                
-                for key in ["parametrization", "assignment_tcp"]:
+
+                # assignment_php is the only param we do not want to save
+                self.param.pop("assignment_php") 
+
+                for key in self.param.keys():
                     self.write_parameters(key, self.param[key])
 
             else:
@@ -257,7 +287,7 @@ class UI(QWidget, Logger):
             self.occupied.set()
 
             msg = self.queue.get()
-            self.log("I received message '{}'.".format(msg))
+            self.log("I received message '{}'.".format(msg), level=1)
 
             command = eval("self.{}".format(msg[0]))
             args = msg[1:]
@@ -307,9 +337,9 @@ class UI(QWidget, Logger):
         self.frames["load_game_new_game_php"].prepare()
         self.frames["load_game_new_game_php"].show()
 
-    def show_frame_game(self, *args):
+    def show_frame_game(self):
 
-        self.frames["game"].prepare(args[0])
+        self.frames["game"].prepare()
 
         for frame in self.frames.values():
             frame.hide()
@@ -346,6 +376,14 @@ class UI(QWidget, Logger):
 
         self.frames["assign_php"].prepare()
         self.frames["assign_php"].show()
+
+    def show_menubar_frame_config_files(self):
+
+        self.menubar_frames["config_files"].show()
+
+    def show_menubar_frame_erase_sql_tables(self):
+
+        self.menubar_frames["erase_sql_tables"].show()
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):
         """question with customs buttons"""
@@ -532,6 +570,9 @@ class UI(QWidget, Logger):
 
     def php_scan_button(self):
         self.controller_queue.put(("ui_php_scan_button", ))
+
+    def php_erase_sql_tables(self, tables):
+        self.controller_queue.put(("ui_php_erase_sql_tables", tables))
 
     def php_run_game(self):
         self.controller_queue.put(("ui_php_run_game", ))

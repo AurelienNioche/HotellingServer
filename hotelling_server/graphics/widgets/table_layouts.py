@@ -4,10 +4,11 @@ from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, \
 
 
 class TableLayout(QWidget):
+
     name = "TableLayout"
 
     def __init__(self, parent, role, labels):
-
+        
         super().__init__()
 
         self.setParent(parent)
@@ -22,7 +23,7 @@ class TableLayout(QWidget):
         self.setLayout(self.layout)
 
     def prepare(self, rows):
-
+        
         columns = self.columns["fancy_labels"]
 
         # empty tables
@@ -46,18 +47,17 @@ class TableLayout(QWidget):
             self.table.setHorizontalHeaderItem(i, QTableWidgetItem(param))
 
         # set rows names (server ids, then game ids)
-        for i, idx in enumerate(rows):
+        for i, ids in enumerate(rows):
             self.table.setVerticalHeaderItem(
-                i, QTableWidgetItem("Server id: {} |".format(idx))
+                    i, QTableWidgetItem("Server id: {} | Game id: {}".format(*ids))
             )
 
     def update(self, rows, parameters):
 
-        # set row names (server ids, game ids) when connected
-        for i, idx in enumerate(rows):
-            text = self.table.verticalHeaderItem(i).text().split("|")[0]
+        # set rows names (server ids, then game ids)
+        for i, ids in enumerate(rows):
             self.table.setVerticalHeaderItem(
-                i, QTableWidgetItem("{}| Game id: {}".format(text, idx))
+                    i, QTableWidgetItem("Server id: {} | Game id: {}".format(*ids))
             )
 
         self.fill_table(rows, parameters)
@@ -65,7 +65,7 @@ class TableLayout(QWidget):
     def fill_table(self, rows, parameters):
 
         # for each game_id
-        for x, game_id in enumerate(rows):
+        for x, (name, game_id) in enumerate(rows):
 
             # for each label
             for y, label in enumerate(self.columns["labels"]):

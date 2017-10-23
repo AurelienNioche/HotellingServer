@@ -81,12 +81,12 @@ class TimeManager(Logger):
         self.t += 1
         
         # The game is going to stop, it's time to declare ending time
-        if not self.continue_game and not self.ending_t:
+        if not self.continue_game and self.ending_t is None:
             self.log("This turn is going to be the last one!")
             self.ending_t = self.t
 
-        # Ending time is defined and all clients got it (if it's works correctly)
-        elif not self.continue_game and self.ending_t:
+        # Ending time is defined and all clients got it
+        elif not self.continue_game and self.ending_t is not None:
             self.log("GAME ENDS NOW.")
             self.state = "end_game"
             self.controller.queue.put(("time_manager_stop_game", ))

@@ -41,6 +41,8 @@ class Data(Logger):
         self.time_manager_ending_t = None
         self.continue_game = True
 
+        self.n_agents = None
+
         self.assignment = {}
 
         self.parametrization = {}
@@ -50,9 +52,10 @@ class Data(Logger):
 
         self.keys = [
             "network", "game", "folders", "map_android_id_server_id",
-            "parametrization", "assignment_tcp", "assignment_php", "map_php"]
+            "parametrization", "assignment_tcp", "assignment_php", "map_php", "sql_tables"]
 
         self.param = {}
+
         self.setup()
 
     def new(self):
@@ -84,8 +87,11 @@ class Data(Logger):
             with open("hotelling_server/parameters/{}.json".format(key)) as file:
                 self.param[key] = json.load(file)
 
-    def write_param(self, key, new_value):
+        # self.n_agents = self.param["game"]["n_customers"] + self.param["game"]["n_firms"]
 
+    def write_param(self, key, new_value):
+        
+        self.log(new_value)
         self.controller.backup.write_param(key, new_value)
 
     def save(self):

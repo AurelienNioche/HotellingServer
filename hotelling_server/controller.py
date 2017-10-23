@@ -3,7 +3,7 @@ from threading import Thread
 
 from utils.utils import Logger
 from hotelling_server.control import backup, data, game, statistician, \
-        id_manager, time_manager
+        id_manager, time_manager, initialization
 
 
 class Controller(Thread, Logger):
@@ -33,6 +33,8 @@ class Controller(Thread, Logger):
         self.backup = backup.Backup(controller=self)
         self.statistician = statistician.Statistician(controller=self)
         self.game = game.Game(controller=self)
+        self.init = initialization.Init(controller=self)
+
         self.server = None
 
         # For giving instructions to graphic process
@@ -53,6 +55,7 @@ class Controller(Thread, Logger):
 
         # Prepares ui frames
         self.ask_interface("prepare_frames")
+        self.ask_interface("prepare_window")
 
         self.ask_interface("show_frame_setting_up")
 
@@ -61,7 +64,7 @@ class Controller(Thread, Logger):
 
         while not self.shutdown.is_set():
 
-            self.log("Waiting for a message.")
+            self.log("Waiting for a message.", level=1)
             message = self.queue.get()
             self.handle_message(message)
 
@@ -77,7 +80,7 @@ class Controller(Thread, Logger):
 
         self.start_server()
 
-        self.ask_interface("show_frame_game", self.get_current_data())
+        self.ask_interface("show_frame_game")
 
         self.log("Game launched.")
 
@@ -97,9 +100,11 @@ class Controller(Thread, Logger):
         self.running_game.set()
 
         # server if it was not launched
-        self.server_queue.put(("Abort",))
-        self.server.shutdown()
-        self.server.end()
+        if self.server_queue is not None:
+            self.server_queue.put(("Abort",))
+            self.server.shutdown()
+            self.server.end()
+
         self.shutdown.set()
 
     def fatal_error_of_communication(self):
@@ -178,9 +183,14 @@ class Controller(Thread, Logger):
             self.add_device_to_map_android_id_server_id(server_data)
         
         # When game is launched
+        elif "ask_init" in server_data:
+            response = self.init.ask_init(server_data)
+            self.server_queue.put(("reply", response))
+
         else:
             response = self.game.handle_request(server_data)
             self.server_queue.put(("reply", response))
+
 
     def server_update_client_time_on_interface(self, args):
         """
@@ -194,22 +204,25 @@ class Controller(Thread, Logger):
     # ------------------------------ UI interface  -------------------------------------------#
 
     def ui_set_server(self, server_class):
-        self.log("Server's class: {}".format(server_class))
+        self.log("Server's class: {}".format(server_class), level=1)
         self.server = server_class(controller=self)
         self.server_queue = self.server.queue
+        self.init.set_server_class(server_class)
         self.ask_interface("set_server_class_parametrization_frame", server_class)
     
     def ui_set_server_parameters(self, param):
-        self.log("Setting server parameters from interface: {}".format(param))
+        self.log("Setting server parameters from interface: {}".format(param), level=1)
         self.server.setup(param)
         self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
-        self.log("Setting game assignement from interface: {}".format(assignment))
+        self.log("Setting game assignement from interface: {}".format(assignment), level=1)
         self.data.assignment = assignment
+        self.init.set_assignment(assignment)
+        self.ask_interface("set_assignment_game_frame", assignment)
 
     def ui_set_parametrization(self, param):
-        self.log("Setting parametrization from interface : {}".format(param))
+        self.log("Setting parametrization from interface : {}".format(param), level=1)
         self.data.parametrization = param
 
     def ui_tcp_run_game(self):
@@ -222,6 +235,12 @@ class Controller(Thread, Logger):
     def ui_load_game(self, file):
         self.log("UI ask 'load game'.")
         self.data.load(file)
+        
+        # set assignment for interface (display game_view) and init
+        assignment = self.data.assignment
+        self.init.set_assignment(assignment)
+        self.ask_interface("set_assignment_game_frame", assignment)
+
         self.time_manager.setup()
         self.launch_game()
         self.game.load()
@@ -246,8 +265,7 @@ class Controller(Thread, Logger):
     def ui_update_game_view_data(self):
 
         if self.running_game.is_set():
-
-            self.log("UI asks 'update data'.")
+            self.log("UI asks 'update data'.", level=1)
             self.ask_interface("update_tables", self.get_current_data())
             self.ask_interface("update_figures", self.get_current_data())
 
@@ -275,24 +293,18 @@ class Controller(Thread, Logger):
 
     def ui_php_run_game(self):
 
-        potential_participants = self.server.get_waiting_list()
-
-        self.server.ask_for_erasing_tables()
-        
-        # add self.data.n_agents?
-        participants = \
-            potential_participants[:self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]]
-
-        roles = [i[1] for i in self.data.assignment if i[2] is False]  # Order is 'name', 'role', 'bot'
-        # Why not -> [role for name, role, bot in self.data.assignement if not bot]?
+        roles = [i[2] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
+        participants = [i[1] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
+        game_ids = [i[0] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
 
         # write participants mapping to json file
-        mapping = {str(i): participants[i] for i in range(len(participants))}
+        mapping = {str(game_id): name for game_id, name, role, bot in self.data.assignment}
         
         self.data.param["map_php"] = mapping
         self.data.write_param("map_php", mapping)
+        self.data.write_param("assignment_php", self.data.assignment)
 
-        self.server.authorize_participants(participants, roles)
+        self.server.authorize_participants(participants=participants, roles=roles, game_ids=game_ids)
 
         self.ask_interface("show_frame_parametrization")
 
@@ -313,6 +325,13 @@ class Controller(Thread, Logger):
             participants = waiting_list[:n_player]
 
         self.ask_interface("update_participants", participants)
+
+    def ui_php_erase_sql_tables(self, tables):
+        
+        if self.server is not None and self.server.server_address is not None:
+            self.server.ask_for_erasing_tables(tables)
+        else:
+            self.ask_interface("show_warning", "Server is not configured!")
     
     # ------------------------------ Time Manager interface ------------------------------------ #
 
@@ -330,6 +349,18 @@ class Controller(Thread, Logger):
         self.statistician.compute_profits()
         self.statistician.compute_mean_utility()
 
+    # ------------------------------ Initialization interface ------------------------------------ #
+
+    def init_get_ids_from_client_name_tcp(self, client_name):
+
+        self.init.queue.put(*(server_id, game_id))
+
+    def init_get_client_name_from_game_id_php(self, game_id):
+
+        name = self.id_manager.get_client_name_from_game_id(game_id)
+
+        self.init.queue.put(name)
+        
     # ---------------------- Parameters management -------------------------------------------- #
 
     def get_current_data(self):

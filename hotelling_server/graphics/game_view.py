@@ -23,7 +23,7 @@ class GameFrame(QWidget, Logger):
 
         self.param = param
 
-        self.controller = self.parent().mod.controller
+        self.assignment = None
 
         self.stop_button = QPushButton()
         self.switch_button = QPushButton()
@@ -102,12 +102,15 @@ class GameFrame(QWidget, Logger):
     def set_server_address(self, address):
         self.address_text = address
 
-    def prepare(self, parameters):
+    def set_assignment(self, assignment):
+        self.assignment = assignment
+
+    def prepare(self):
 
         self.log("Preparing...")
         self._prepare_figures()
         self._prepare_buttons()
-        self._prepare_tables(parameters)
+        self._prepare_tables()
         self._prepare_address_label()
         self.log("Preparation done!")
 
@@ -122,9 +125,9 @@ class GameFrame(QWidget, Logger):
 
         self._initialize_figures()
 
-    def _prepare_tables(self, parameters):
+    def _prepare_tables(self):
 
-        self._initialize_tables(parameters)
+        self._initialize_tables()
 
     def _prepare_buttons(self):
 
@@ -172,25 +175,14 @@ class GameFrame(QWidget, Logger):
 
         self.trial_counter.set_trial_number(trial_n)
 
-    def _initialize_tables(self, parameters):
+    def _initialize_tables(self):
 
         for key, table in self.table_layout.items():
             table.prepare(
-                rows=[name for name, role, bot in parameters["assignment"] if role == key]
+                rows=[(name, game_id) for game_id, name, role, bot in self.assignment if role == key]
             )
 
     # -------------------------------------- These methods need to be moved elsewhere ------------------------- # 
-
-    @staticmethod
-    def _get_ids(parameters):
-        
-        firm_id = list(parameters["firms_id"].keys())
-        customer_id = list(parameters["customers_id"].keys())
-
-        ids = {"firm": sorted(firm_id),
-               "customer": sorted(customer_id)}
-        
-        return ids
 
     @staticmethod
     def _get_labels(role):
@@ -232,9 +224,11 @@ class GameFrame(QWidget, Logger):
 
     def update_tables(self, parameters):
         
-        ids = self._get_ids(parameters)
+        ids = {}
 
         for role in self.table_layout.keys():
+
+            ids[role] = [(name, game_id) for game_id, name, r, bot in self.assignment if role == r]
 
             if not self.table_layout[role].isHidden():
 
