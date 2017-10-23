@@ -92,7 +92,7 @@ class Game(Logger):
         n_customers = 0
         n_agents_to_wait = 0
 
-        for server_id, role, bot in self.assignment:
+        for game_id, server_id, role, bot in self.assignment:
             if bot:
                 n_firms += role == "firm"
                 n_customers += role == "customer"
@@ -127,7 +127,7 @@ class Game(Logger):
         args = [int(a) if a.isdigit() else a for a in whole[1:]]
 
         # don't launch methods if init is not done
-        if not self.data.current_state["init_done"] and command != self.ask_init:
+        if not self.data.current_state["init_done"]:
             to_client = "error/wait_init"
 
         # regular launch method
@@ -140,31 +140,6 @@ class Game(Logger):
         self.data.save()
 
         return to_client
-
-    # -----------------------| game sides methods |------------------------------------------- #
-
-    def get_role(self, server_id):
-
-        for idx, role, bot in self.assignment:
-            if idx == str(server_id):
-                return role
-
-        # in case of no matching id
-        if server_id not in self.unexpected_id_list:
-            self.unexpected_client_id(server_id)
-        
-    def unexpected_client_id(self, server_id):
-
-        self.controller.ask_interface("unexpected_client_id", server_id)
-        self.unexpected_id_list.append(server_id)
-
-    def check_remaining_agents(self):
-
-        remaining = self.n_agents - (len(self.data.firms_id) + len(self.data.customers_id))
-
-        if not remaining:
-            self.data.current_state["init_done"] = True
-            self.time_manager.check_state()
 
     # ---------------------------| firms sides methods |----------------------------------------- #
 
@@ -291,133 +266,6 @@ class Game(Logger):
     
     def set_state(self, role, role_id, state):
         self.data.current_state["{}_states".format(role)][role_id] = state
-
-    # -----------------------------------| init methods |--------------------------------------#
-    
-    def ask_init(self, name):
-        
-        if not self.is_ended():
-            
-            cond = self.controller.server.name == "TCPServer"
-            
-            if cond:
-
-                return self.ask_init_tcp(function_name(), name)
-
-            else:
-
-                return self.ask_init_php(function_name(), name)
-        else:
-            return "Game ended. Connection refused"
-
-    def ask_init_tcp(self, func_name, client_name):
-
-        server_id, game_id = \
-            self.controller.id_manager.get_ids_from_android_id(
-                client_name, max_n=len(self.data.roles))  # Should not be here
-
-        if game_id != -1:
-            
-            role = self.get_role(server_id)
-
-            if not role:
-                return "Unknown server id: {}".format(server_id)
-
-            self.data.roles[game_id] = role
-
-            if role == "firm":
-                return self.init_firms(func_name, game_id, role)
-
-            else:
-                return self.init_customers(func_name, game_id, role)
-
-        else:
-            return "Error with ID manager. Maybe not authorized to participate."
-
-    def ask_init_php(self, func_name, game_id):
-
-        client_name = self.controller.id_manager.get_client_name_from_game_id(game_id)  # Should not be here
-        role = self.get_role(client_name)
-
-        self.data.roles[game_id] = role
-
-        if role == "firm":
-            rep = self.init_firms(func_name, game_id, role)
-        else:
-            rep = self.init_customers(func_name, game_id, role)
-
-        # Suppress the 'role' arg in the response.
-        # As well as game_id. 
-        args = rep["response"].split("/")
-        args.pop(3)  # 3 is the index of the 'role' arg.
-
-        without_role_args = "/".join(args)
-
-        rep["response"] = without_role_args
-
-        return rep
-
-    def init_customers(self, func_name, game_id, role):
-
-        if game_id not in self.data.customers_id.keys():
-            customer_id = len(self.data.customers_id)
-            self.data.customers_id[game_id] = customer_id
-
-        else:
-            customer_id = self.data.customers_id[game_id]
-
-        position, exploration_cost, utility_consumption, utility = self.get_customers_data(customer_id)
-
-        self.check_remaining_agents()
-
-        self.set_state(role="customer", role_id=customer_id, state=function_name())
-
-        return self.reply(
-            game_id,
-            func_name, self.time_manager.t, role, position, exploration_cost,
-            utility_consumption, utility)
-
-    def get_customers_data(self, customer_id):
-
-        position = customer_id + 1
-        exploration_cost = self.interface_parameters["exploration_cost"]
-        utility_consumption = self.interface_parameters["utility_consumption"]
-        utility = self.data.current_state["customer_cumulative_utility"][customer_id]
-
-        return position, exploration_cost, utility_consumption, utility
-
-    def init_firms(self, func_name, game_id, role):
-
-        if game_id not in self.data.firms_id.keys():
-            firm_id = len(self.data.firms_id)
-            self.data.firms_id[game_id] = firm_id
-
-        # if device already asked for init, get id
-        else:
-            firm_id = self.data.firms_id[game_id]
-
-        state, position, price, opp_position, opp_price, profits = self.get_firms_data(firm_id)
-
-        self.check_remaining_agents()
-
-        self.set_state(role="firm", role_id=firm_id, state=function_name())
-
-        return self.reply(game_id, func_name, self.time_manager.t,
-            role, position, state, price, opp_position, opp_price, profits)
-
-    def get_firms_data(self, firm_id):
-
-        opponent_id = (firm_id + 1) % 2
-
-        state = self.data.current_state["firm_status"][firm_id]
-
-        position = self.data.current_state["firm_positions"][firm_id]
-        price = self.data.current_state["firm_prices"][firm_id]
-        opp_position = self.data.current_state["firm_positions"][opponent_id]
-        opp_price = self.data.current_state["firm_prices"][opponent_id]
-        profits = self.data.current_state["firm_cumulative_profits"][firm_id]
-
-        return state, position, price, opp_position, opp_price, profits
 
     # -----------------------------------| customer demands |--------------------------------------#
 

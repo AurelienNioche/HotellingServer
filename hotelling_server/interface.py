@@ -4,7 +4,9 @@ from subprocess import getoutput
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget, QMenuBar
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
-        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view
+        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
+        erase_sql_tables_view
+
 from utils.utils import Logger
 
 
@@ -28,6 +30,7 @@ class UI(QWidget, Logger):
         self.layout = QVBoxLayout()
 
         self.frames = dict()
+        self.menubar_frames = dict()
 
         self.param = dict()
         self.old_param = dict()
@@ -50,12 +53,7 @@ class UI(QWidget, Logger):
 
         self.controller_queue = None
 
-
-    def prepare_menu_bar(self):
-
-        self.menu_bar = QMenuBar(self)
-        self.menu_bar.addMenu('File')
-        self.menu_bar.show()
+        self.menubar = menubar.MenuBar(parent=self)
 
     @property
     def dimensions(self):
@@ -89,9 +87,10 @@ class UI(QWidget, Logger):
 
         self.frames["game"].set_server_address(address)
 
-    def _get_parameters(self, *keys):
-        """get selected params in order to pass them to view's constructors"""
-        return {k: v for k, v in self.param.items() if k in keys}
+    def set_assignment_game_frame(self, assignment):
+        """Set assignment displayed in game view rows"""
+
+        self.frames["game"].set_assignment(assignment)
 
     def stop_scanning_network(self):
 
@@ -101,8 +100,15 @@ class UI(QWidget, Logger):
     def update_participants(self, participants):
         self.frames["assign_php"].update_participants(participants)
 
+    # ----------------- called by views methods -------------------------------------------------------- # 
     def save_parameters(self, key, data):
         self.param[key] = data
+
+    # -------------------------------------------------------------------------------------------------- # 
+
+    def _get_parameters(self, *keys):
+        """get selected params in order to pass them to view's constructors"""
+        return {k: v for k, v in self.param.items() if k in keys}
 
     def setup(self):
 
@@ -121,6 +127,7 @@ class UI(QWidget, Logger):
 
     def prepare_frames(self): 
 
+        # ------------------- Main window frames ---------------------------- # 
         self.frames["start"] = \
             start_view.StartFrame(parent=self)
 
@@ -155,7 +162,19 @@ class UI(QWidget, Logger):
         self.frames["setting_up"] = \
             setting_up_view.SettingUpFrame(parent=self)
 
-        # --------------------------------------------------- # 
+        # ------------------- Menu bar frames ---------------------------- # 
+
+        self.menubar_frames["config_files"] = \
+                config_files_view.ConfigFilesWindow(parent=self,
+                param=self._get_parameters("parametrization", "network", "game", "sql_tables", "folders"))
+
+        self.menubar_frames["erase_sql_tables"] = \
+                erase_sql_tables_view.EraseSQLTablesFrame(parent=self,
+                param=self._get_parameters("sql_tables"))
+
+        # ---------------------------------------------------------------- # 
+    
+    def prepare_window(self):
 
         self.setWindowTitle(self.app_name)
 
@@ -169,6 +188,7 @@ class UI(QWidget, Logger):
             grid.addWidget(frame, 0, 0)
 
         grid.setAlignment(Qt.AlignCenter)
+
         self.layout.addLayout(grid, stretch=1)
 
         self.setLayout(self.layout)
@@ -240,8 +260,11 @@ class UI(QWidget, Logger):
         if cond:
 
             if self.show_question("Do you want to save the change in parameters and assignment?"):
-                
-                for key in ["parametrization", "assignment_tcp"]:
+
+                # assignment_php is the only param we do not want to save
+                self.param.pop("assignment_php") 
+
+                for key in self.param.keys():
                     self.write_parameters(key, self.param[key])
 
             else:
@@ -314,9 +337,9 @@ class UI(QWidget, Logger):
         self.frames["load_game_new_game_php"].prepare()
         self.frames["load_game_new_game_php"].show()
 
-    def show_frame_game(self, *args):
+    def show_frame_game(self):
 
-        self.frames["game"].prepare(args[0])
+        self.frames["game"].prepare()
 
         for frame in self.frames.values():
             frame.hide()
@@ -353,6 +376,14 @@ class UI(QWidget, Logger):
 
         self.frames["assign_php"].prepare()
         self.frames["assign_php"].show()
+
+    def show_menubar_frame_config_files(self):
+
+        self.menubar_frames["config_files"].show()
+
+    def show_menubar_frame_erase_sql_tables(self):
+
+        self.menubar_frames["erase_sql_tables"].show()
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):
         """question with customs buttons"""

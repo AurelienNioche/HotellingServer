@@ -47,26 +47,25 @@ class TableLayout(QWidget):
             self.table.setHorizontalHeaderItem(i, QTableWidgetItem(param))
 
         # set rows names (server ids, then game ids)
-        for i, idx in enumerate(rows):
+        for i, ids in enumerate(rows):
             self.table.setVerticalHeaderItem(
-                i, QTableWidgetItem("Server id: {} |".format(idx))
+                    i, QTableWidgetItem("Server id: {} | Game id: {}".format(*ids))
             )
 
     def update(self, rows, parameters):
 
-        # set row names (server ids, game ids) when connected
-        for i, idx in enumerate(rows):
-                text = self.table.verticalHeaderItem(i).text().split("|")[0]
-                self.table.setVerticalHeaderItem(
-                    i, QTableWidgetItem("{}| Game id: {}".format(text, idx))   
-                )
+        # set rows names (server ids, then game ids)
+        for i, ids in enumerate(rows):
+            self.table.setVerticalHeaderItem(
+                    i, QTableWidgetItem("Server id: {} | Game id: {}".format(*ids))
+            )
 
         self.fill_table(rows, parameters)
 
     def fill_table(self, rows, parameters):
 
         # for each game_id
-        for x, game_id in enumerate(rows):
+        for x, (name, game_id) in enumerate(rows):
 
             # for each label
             for y, label in enumerate(self.columns["labels"]):

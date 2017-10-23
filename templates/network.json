@@ -1,1 +1,1 @@
-{"ip_local": "localhost", "ip_address": "192.168.1.31", "ip_autodetect": true, "port": 8081, "local": true, "php_server": ""}
+{"ip_local": "", "ip_address": "", "ip_autodetect": true, "port": 8081, "local": true, "php_server": ""}

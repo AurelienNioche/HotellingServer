@@ -87,10 +87,11 @@ class Data(Logger):
             with open("hotelling_server/parameters/{}.json".format(key)) as file:
                 self.param[key] = json.load(file)
 
-        self.n_agents = self.param["game"]["n_customers"] + self.param["game"]["n_firms"]
+        # self.n_agents = self.param["game"]["n_customers"] + self.param["game"]["n_firms"]
 
     def write_param(self, key, new_value):
-
+        
+        self.log(new_value)
         self.controller.backup.write_param(key, new_value)
 
     def save(self):

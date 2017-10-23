@@ -63,10 +63,10 @@ class PHPServer(Thread, Logger):
 
         return participants
 
-    def authorize_participants(self, participants, roles):
+    def authorize_participants(self, participants, roles, game_ids):
 
         names = json.dumps(participants)
-        game_ids = json.dumps(list(range(len(participants))))
+        game_ids = json.dumps(game_ids)
         roles = json.dumps(roles)
 
         data = {"demand_type": "writing",

@@ -3,7 +3,6 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
     QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QMessageBox, QFormLayout, QDialog
 
 from utils.utils import Logger
-import warnings
 
 
 class AssignmentFramePHP(Logger, QWidget):
@@ -21,24 +20,12 @@ class AssignmentFramePHP(Logger, QWidget):
         self.next_button = QPushButton("Next")
         self.previous_button = QPushButton("Previous")
         self.scan_button = QPushButton("Look for new participants...")
-        self.erase_sql_tables_button = QPushButton("Erase tables...")
-
-        # Window popping to erase sql tables
-        self.erase_sql_tables_window = QDialog(self)
-        self.erase_sql_tables_window.setLayout(QVBoxLayout())
-        self.erase_sql_tables_window.setWindowTitle("Erase tables")
-        self.cancel_button = QPushButton("Cancel")
-        self.ok_button = QPushButton("Ok")
-        self.tables_check_boxes = {}
-        self.form_layout = QFormLayout()
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
         self.group.addButton(self.scan_button)
-        self.group.addButton(self.erase_sql_tables_button)
-
 
         self.parameters = dict()
 
@@ -57,7 +44,7 @@ class AssignmentFramePHP(Logger, QWidget):
 
         n_agents = len(roles)
 
-        labels = ("Name", "Firm " + " Customer", "Bot")
+        labels = ("Game id", "Name", "Firm " + " Customer", "Bot")
 
         # noinspection PyUnusedLocal
         self.parameters["assign"] = [[] for i in range(n_agents)]
@@ -68,25 +55,17 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.fill_layout(labels, n_agents)
 
-        self.fill_erase_sql_tables_window(self.param["sql_tables"]["table_names"])
-
         # noinspection PyUnresolvedReferences
         self.next_button.clicked.connect(self.push_next_button)
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
         # noinspection PyUnresolvedReferences
         self.scan_button.clicked.connect(self.push_scan_button)
-        # noinspection PyUnresolvedReferences
-        self.erase_sql_tables_button.clicked.connect(self.push_erase_sql_tables_button)
-        # noinspection PyUnresolvedReferences
-        self.ok_button.clicked.connect(self.push_ok_button)
-        # noinspection PyUnresolvedReferences
-        self.cancel_button.clicked.connect(self.push_cancel_button)
 
         self.setup_done = True
 
     def fill_layout(self, labels, n_agents):
-
+        
         # prepare layout
         grid_layout = QGridLayout()
 
@@ -111,12 +90,11 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addLayout(horizontal_layout)
         
         self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
-        self.layout.addWidget(self.erase_sql_tables_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
     def prepare(self):
-
+        
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
         self.setFocus()
@@ -124,7 +102,9 @@ class AssignmentFramePHP(Logger, QWidget):
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
-            self.parameters["assign"][i].append(IntParameter(parent=self, value="Bot", idx=i))
+            self.parameters["assign"][i].append(IntParameter(parent=self, value=i, idx=i, greyed=False, event=False))
+            
+            self.parameters["assign"][i].append(IntParameter(parent=self, value="Bot", idx=i, greyed=True, event=True))
 
             self.parameters["assign"][i].append(RadioParameter(checked=roles[i]))
 
@@ -168,8 +148,8 @@ class AssignmentFramePHP(Logger, QWidget):
     def update_participants(self, participants):
 
         for i, name in enumerate(participants):
-            line_edit = self.parameters["assign"][i][0].edit  # line edit widget
-            check_box = self.parameters["assign"][i][2].check_box  # check box widget
+            line_edit = self.parameters["assign"][i][1].edit  # line edit widget (server id)
+            check_box = self.parameters["assign"][i][3].check_box  # check box widget (bot or not)
 
             self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
 
@@ -180,16 +160,26 @@ class AssignmentFramePHP(Logger, QWidget):
     def check_assignment_validity(self):
 
         assignment = list(enumerate(self.get_parameters()))
+        n_firm = 0
 
-        for i, (server_id, role, bot) in assignment:
+        for i, (game_id, server_id, role, bot) in assignment:
 
-            for j, (other_id, other_role, other_bot) in assignment:
+            n_firm += role == "firm"
 
-                if other_id == server_id and other_id != "Bot" and i != j:
-                    return "Two identical ids: '{}'.".format(server_id)
+            for j, (other_game_id, other_server_id, other_role, other_bot) in assignment:
 
+                if other_server_id == server_id and other_server_id != "Bot" and i != j:
+                    return "Two identical server ids: '{}'.".format(server_id)
+
+                if other_game_id == game_id and i != j:
+                    return "Two identical game_id ids: '{}'.".format(game_id)
+
+        # if role config is not respected
+        if n_firm != 2:
+            return "Wrong number of firm: '{}'".format(n_firm)
+                
     def get_parameters(self):
-        return [[i.get_value(), j.get_value(), k.get_value()] for i, j, k in self.parameters["assign"]]
+        return [[int(i.get_value()), j.get_value(), k.get_value(), l.get_value()] for i, j, k, l in self.parameters["assign"]]
     
     def show_warning(self, **instructions):
 
@@ -203,9 +193,8 @@ class AssignmentFramePHP(Logger, QWidget):
         if self.setup_done:
 
             # get desired widgets
-            line_edit = self.parameters["assign"][idx][0].edit  # line edit widget
-            check_box = self.parameters["assign"][idx][2].check_box  # check box widget
-            warnings.warn("Hard variables without clear meaning here!")
+            line_edit = self.parameters["assign"][idx][1].edit  # line edit widget (server_id)
+            check_box = self.parameters["assign"][idx][3].check_box  # check box widget (bot or not)
 
             # if line edit (containing server ids) is not enabled
             if not line_edit.isEnabled():
@@ -231,53 +220,7 @@ class AssignmentFramePHP(Logger, QWidget):
         line_edit.setStyleSheet("")
         line_edit.setFocus(True)
 
-        # --------------------------------- Erase Tables Window  --------------------------------- #
-
-    def fill_erase_sql_tables_window(self, tables):
-        
-        for label in tables:
-            self.tables_check_boxes[label] = QCheckBox()
-            self.form_layout.addRow(QLabel(label), self.tables_check_boxes[label])
-
-        self.form_layout.setFormAlignment(Qt.AlignHCenter)
-
-        horizontal_layout = QHBoxLayout()
-
-        horizontal_layout.addWidget(self.ok_button, alignment=Qt.AlignRight)
-        horizontal_layout.addWidget(self.cancel_button, alignment=Qt.AlignRight)
-
-        self.erase_sql_tables_window.layout().addLayout(self.form_layout)
-        self.erase_sql_tables_window.layout().addLayout(horizontal_layout)
-
-    def push_erase_sql_tables_button(self):
-
-        self.erase_sql_tables_button.setEnabled(False)
-        
-        self.erase_sql_tables_window.show()
-
-        self.erase_sql_tables_button.setEnabled(True)
-
-    def push_cancel_button(self):
-
-        self.cancel_button.setEnabled(False)
-
-        self.erase_sql_tables_window.hide()
-
-        self.cancel_button.setEnabled(True)
-
-    def push_ok_button(self):
-
-        self.ok_button.setEnabled(False)
-
-        checked_tables = [k for k, v in self.tables_check_boxes.items() if v.isChecked()]
-
-        if len(checked_tables):
-            self.parent().php_erase_sql_tables(checked_tables)
-
-        self.erase_sql_tables_window.hide()
-        self.ok_button.setEnabled(True)
-
-        # --------------------------------- Widgets used in assignment menu --------------------------------- #
+    # --------------------------------- Widgets used in assignment menu --------------------------------- #
 
 
 class RadioParameter(object):
@@ -317,9 +260,9 @@ class RadioParameter(object):
 
 
 class IntParameter(object):
-    """server_id"""
+    """game_id and server_id"""
 
-    def __init__(self, parent, value, idx):
+    def __init__(self, parent, value, idx, greyed, event):
 
         self.idx = idx
         self.edit = QLineEdit(str(value))
@@ -329,17 +272,18 @@ class IntParameter(object):
                               border-radius: 2px;'''
 
         self.filter = MouseClick(parent=parent, idx=idx)
-        self.setup(value)
+        self.setup(greyed, event)
 
-    def setup(self, value):
-
-        if value == "Bot":
+    def setup(self, greyed, event):
+        
+        if greyed:
             self.edit.setEnabled(False)
             self.edit.setStyleSheet(self.edit.greyed_style)
         else:
             self.edit.setEnabled(True)
 
-        self.edit.installEventFilter(self.filter)
+        if event:
+            self.edit.installEventFilter(self.filter)
 
     def get_value(self):
 
