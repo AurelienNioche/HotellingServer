@@ -95,7 +95,7 @@ class PHPServer(Thread, Logger):
             response = rq.get(self.server_address, params=data)
             self.log("I got the response '{}' from the distant server.".format(response.text))
 
-            if "Those tables have been erased." in response.text:
+            if "Tables" in response.text and "have been erased" in response.text:
                 break
 
     def serve(self):
