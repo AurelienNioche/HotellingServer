@@ -35,11 +35,12 @@ class EraseSQLTablesFrame(QWidget):
 
         for label in self.tables:
             self.tables_check_boxes[label] = QCheckBox()
+            self.tables_check_boxes[label].setChecked(True)
             form_layout.addRow(QLabel(label), self.tables_check_boxes[label])
 
-        form_layout.setFormAlignment(Qt.AlignRight)
-        form_layout.setAlignment(Qt.AlignRight)
-        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setFormAlignment(Qt.AlignCenter)
+        form_layout.setAlignment(Qt.AlignCenter)
+        form_layout.setLabelAlignment(Qt.AlignCenter)
 
         horizontal_layout = QHBoxLayout()
 
