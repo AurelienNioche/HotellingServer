@@ -47,7 +47,7 @@ class AssignmentFramePHP(Logger, QWidget):
         labels = ("Game id", "Name", "Firm " + " Customer", "Bot")
 
         # noinspection PyUnusedLocal
-        self.parameters["assign"] = [[] for i in range(n_agents)]
+        self.parameters["assign"] = [{} for i in range(n_agents)]
 
         self.new_setup(n_agents=n_agents, roles=roles)
         
@@ -73,11 +73,13 @@ class AssignmentFramePHP(Logger, QWidget):
         for y, label in enumerate(labels):
             grid_layout.addWidget(QLabel(label), 0, y)
 
+        keys = ("game_id", "server_id", "role", "bot")
+
         # grid layout coordinates
-        coordinates = [(x, y) for x in range(1, n_agents + 1) for y in range(len(labels))]
+        coordinates = [(x, y) for x in range(1, n_agents + 1) for y in range(len(keys))]
 
         # parameters index
-        index = [(i, j) for i in range(n_agents) for j in range(len(labels))]
+        index = [(i, j) for i in range(n_agents) for j in keys]
 
         for (i, j), (x, y) in zip(index, coordinates):
             self.parameters["assign"][i][j].add_to_grid_layout(grid_layout, x, y)
@@ -102,13 +104,13 @@ class AssignmentFramePHP(Logger, QWidget):
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
-            self.parameters["assign"][i].append(IntParameter(parent=self, value=i, idx=i, greyed=False, event=False))
+            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self, value=i, idx=i, greyed=False, event=False)
             
-            self.parameters["assign"][i].append(IntParameter(parent=self, value="Bot", idx=i, greyed=True, event=True))
+            self.parameters["assign"][i]["server_id"] = IntParameter(parent=self, value="Bot", idx=i, greyed=True, event=True)
 
-            self.parameters["assign"][i].append(RadioParameter(checked=roles[i]))
+            self.parameters["assign"][i]["role"] = RadioParameter(parent=self, checked=roles[i], idx=i)
 
-            self.parameters["assign"][i].append(CheckParameter(parent=self, checked=True, idx=i))
+            self.parameters["assign"][i]["bot"] = CheckParameter(parent=self, checked=True, idx=i)
 
     # ---------------------- PUSH BUTTONS --------------------------------- #
 
@@ -146,18 +148,26 @@ class AssignmentFramePHP(Logger, QWidget):
     # ------------------------------------------------------------------------------- #
 
     def update_participants(self, participants):
+        
+        if participants:
 
-        for i, name in enumerate(participants):
-            line_edit = self.parameters["assign"][i][1].edit  # line edit widget (server id)
-            check_box = self.parameters["assign"][i][3].check_box  # check box widget (bot or not)
+            for i, name in enumerate(participants):
+                line_edit = self.parameters["assign"][i]["server_id"].edit  # line edit widget (server id)
+                check_box = self.parameters["assign"][i]["bot"].check_box  # check box widget (bot or not)
 
-            self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
+                self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
+
+        else:
+            
+            # if not participants reset server_id widget
+            for line in self.parameters["assign"]:
+                self.disable_line_edit(line["server_id"].edit)
 
         self.scan_button.setEnabled(True)
 
-    # ------------------------------------------------------------------------------- #
+    # ----------------------------- assignment validity checking -------------------------------------------------- #
 
-    def check_assignment_validity(self):
+    def check_assignment_validity(self, **kwargs):
 
         assignment = list(enumerate(self.get_parameters()))
         n_firm = 0
@@ -175,11 +185,34 @@ class AssignmentFramePHP(Logger, QWidget):
                     return "Two identical game_id ids: '{}'.".format(game_id)
 
         # if role config is not respected
-        if n_firm != 2:
-            return "Wrong number of firm: '{}'".format(n_firm)
+        if n_firm != self.param["game"]["n_firms"]:
+            self.remove_or_add_firms(n_firm=n_firm, assignment=assignment, idx=kwargs["idx"])
+
+    def remove_or_add_firms(self, n_firm, assignment, idx):
+
+        nb_of_firm_to_add_or_remove = self.param["game"]["n_firms"] - n_firm
+
+        for i, (game_id, server_id, role, bot) in assignment:
+            
+            if i != idx:
+
+                if nb_of_firm_to_add_or_remove < 0:
+                    
+                    if role == "firm":
+                        self.parameters["assign"][i]["role"].customer.setChecked(True)
+                        nb_of_firm_to_add_or_remove += 1
                 
+                elif  nb_of_firm_to_add_or_remove > 0:
+
+                    if role == "customer":
+                        self.parameters["assign"][i]["role"].firm.setChecked(True)
+                        nb_of_firm_to_add_or_remove -= 1
+
+    # ----------------------------------------------------------------------------------------------------------------- #
+
     def get_parameters(self):
-        return [[int(i.get_value()), j.get_value(), k.get_value(), l.get_value()] for i, j, k, l in self.parameters["assign"]]
+        return [[int(i["game_id"].get_value()), i["server_id"].get_value(), i["role"].get_value(), i["bot"].get_value()]
+                for i in self.parameters["assign"]]
     
     def show_warning(self, **instructions):
 
@@ -193,8 +226,8 @@ class AssignmentFramePHP(Logger, QWidget):
         if self.setup_done:
 
             # get desired widgets
-            line_edit = self.parameters["assign"][idx][1].edit  # line edit widget (server_id)
-            check_box = self.parameters["assign"][idx][3].check_box  # check box widget (bot or not)
+            line_edit = self.parameters["assign"][idx]["server_id"].edit  # line edit widget (server_id)
+            check_box = self.parameters["assign"][idx]["bot"].check_box  # check box widget (bot or not)
 
             # if line edit (containing server ids) is not enabled
             if not line_edit.isEnabled():
@@ -222,11 +255,10 @@ class AssignmentFramePHP(Logger, QWidget):
 
     # --------------------------------- Widgets used in assignment menu --------------------------------- #
 
-
 class RadioParameter(object):
     """role (firm/customer)"""
 
-    def __init__(self, checked):
+    def __init__(self, parent, checked, idx):
 
         self.layout = QHBoxLayout()
 
@@ -234,6 +266,8 @@ class RadioParameter(object):
 
         self.firm = QRadioButton()
         self.customer = QRadioButton()
+
+        self.filter = MouseClick(parent=parent, idx=idx)
 
         self.setup(checked)
 
@@ -249,6 +283,9 @@ class RadioParameter(object):
 
         self.layout.addWidget(self.firm)
         self.layout.addWidget(self.customer)
+
+        self.firm.installEventFilter(self.filter)
+        self.customer.installEventFilter(self.filter)
 
     def get_value(self):
 
@@ -319,7 +356,8 @@ class CheckParameter(object):
 
 class MouseClick(QObject):
     """class used in order
-    to detect if QLineEdit widget
+    to detect if QLineEdit/QRadioButton
+    (respectively roles and server_id widget)
     has been clicked"""
 
     def __init__(self, parent, idx):
@@ -328,8 +366,23 @@ class MouseClick(QObject):
         self.parent = parent
 
     def eventFilter(self, obj, event):
+
         if event.type() == QEvent.MouseButtonPress:
-            self.parent.switch_line_edit(idx=self.idx, from_line=True)
-            return True
+
+            if type(obj) == QRadioButton:
+
+                widget = self.parent.parameters["assign"][self.idx]["role"]
+
+                if widget.firm.isChecked():
+                    widget.customer.setChecked(True)
+                else:
+                    widget.firm.setChecked(True)
+
+                self.parent.check_assignment_validity(idx=self.idx)
+                return True
+
+            else:
+                self.parent.switch_line_edit(idx=self.idx, from_line=True)
+                return True
 
         return False
