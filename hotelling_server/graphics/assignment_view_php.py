@@ -20,12 +20,14 @@ class AssignmentFramePHP(Logger, QWidget):
         self.next_button = QPushButton("Next")
         self.previous_button = QPushButton("Previous")
         self.scan_button = QPushButton("Look for new participants...")
+        self.erase_tables_button = QPushButton("Erase SQL tables")
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
         self.group.addButton(self.scan_button)
+        self.group.addButton(self.erase_tables_button)
 
         self.parameters = dict()
 
@@ -61,6 +63,8 @@ class AssignmentFramePHP(Logger, QWidget):
         self.previous_button.clicked.connect(self.push_previous_button)
         # noinspection PyUnresolvedReferences
         self.scan_button.clicked.connect(self.push_scan_button)
+        # noinspection PyUnresolvedReferences
+        self.erase_tables_button.clicked.connect(self.push_erase_tables_button)
 
         self.setup_done = True
 
@@ -92,6 +96,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addLayout(horizontal_layout)
         
         self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.erase_tables_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
@@ -145,6 +150,13 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.parent().php_scan_button()
 
+    def push_erase_tables_button(self):
+
+        self.erase_tables_button.setEnabled(False)
+
+        self.parent().show_menubar_frame_erase_sql_tables()
+
+        self.erase_tables_button.setEnabled(True)
     # ------------------------------------------------------------------------------- #
 
     def update_participants(self, participants):
