@@ -104,6 +104,10 @@ class UI(QWidget, Logger):
 
         self.menubar_frames["messenger"].new_message_from_user(args[0], args[1])
 
+    def enable_server_related_menubar(self):
+
+        self.menubar.enable_actions()
+
     # ----------------- called by views methods -------------------------------------------------------- # 
     def save_parameters(self, key, data):
         self.param[key] = data

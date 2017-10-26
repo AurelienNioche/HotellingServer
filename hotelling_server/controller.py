@@ -221,6 +221,7 @@ class Controller(Thread, Logger):
         self.server_queue = self.server.queue
         self.init.set_server_class(server_class)
         self.ask_interface("set_server_class_parametrization_frame", server_class)
+        self.ask_interface("enable_server_related_menubar")
     
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param), level=1)
