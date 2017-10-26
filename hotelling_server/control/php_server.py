@@ -52,12 +52,6 @@ class PHPServer(Thread, Logger):
                 self.send_message(msg[1], msg[2])
                 self.serve()
 
-            if msg and msg[0] == "get_message":
-
-                self.wait_event.clear()
-                self.receive_messages()
-                self.serve()
-
         self.log("I'm dead.")
 
     def get_waiting_list(self):
@@ -129,22 +123,26 @@ class PHPServer(Thread, Logger):
 
         while not self.wait_event.is_set():
 
-                response = self.send_request(
-                    demand_type="reading",
-                    table="request"
-                )
+            response = self.send_request(
+                demand_type="reading",
+                table="request"
+            )
 
-                if response.text and response.text.split("&")[0] == "request":
+            if response.text and response.text.split("&")[0] == "request":
 
-                    requests = [i for i in response.text.split("&")[1:] if i]
 
-                    if requests:
-                        for request in requests:
-                            self.cont.queue.put(("server_request", request))
+                requests = [i for i in response.text.split("&")[1:] if i]
 
-                        self.log("I will treat {} request(s).".format(len(requests)))
-                        self.treat_requests(n_requests=len(requests))
-                
+                if requests:
+                    for request in requests:
+                        self.cont.queue.put(("server_request", request))
+
+                    self.log("I will treat {} request(s).".format(len(requests)))
+                    self.treat_requests(n_requests=len(requests))
+
+            # check for new msg
+            self.receive_messages()
+            
     def treat_requests(self, n_requests):
 
         for i in range(n_requests):

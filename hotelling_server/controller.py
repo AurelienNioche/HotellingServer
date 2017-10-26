@@ -141,12 +141,6 @@ class Controller(Thread, Logger):
         self.start_server()
         self.device_scanning_event.set()
 
-    def update_messenger(self):
-
-        if hasattr(self.server, "wait_event"):
-            self.server.wait_event.set()
-            self.server.queue.put(("get_message", ))
-
     def add_device_to_map_android_id_server_id(self, server_data):
 
         android_id = server_data.split("/")[-1]
@@ -276,8 +270,6 @@ class Controller(Thread, Logger):
         self.log("Write interface parameters to json files.")
 
     def ui_update_game_view_data(self):
-
-        self.update_messenger()
 
         if self.running_game.is_set():
             self.log("UI asks 'update data'.", level=1)
