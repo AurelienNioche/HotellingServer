@@ -141,6 +141,12 @@ class Controller(Thread, Logger):
         self.start_server()
         self.device_scanning_event.set()
 
+    def update_messenger(self):
+
+        if hasattr(self.server, "wait_event"):
+            self.server.wait_event.set()
+            self.server.queue.put(("get_message", ))
+
     def add_device_to_map_android_id_server_id(self, server_data):
 
         android_id = server_data.split("/")[-1]
@@ -159,10 +165,12 @@ class Controller(Thread, Logger):
 
         command = message[0]
         args = message[1:]
+        func = getattr(self, command)
+
         if len(args):
-            eval("self.{}(*args)".format(command))
+            func(*args)
         else:
-            eval("self.{}()".format(command))
+            func()
 
     # ------------------------------ Server interface ----------------------------------------#
 
@@ -199,6 +207,11 @@ class Controller(Thread, Logger):
         """
         self.data.current_state["time_since_last_request_{}s".format(
             args[0])][args[1]] = str(args[2])
+
+    def server_new_message(self, user_name, message):
+
+        self.log("Got new message from distant server coming from {}: '{}'.".format(user_name, message))
+        self.ask_interface("controller_new_message", (user_name, message))
    
     # ------------------------------ UI interface  -------------------------------------------#
 
@@ -263,6 +276,8 @@ class Controller(Thread, Logger):
 
     def ui_update_game_view_data(self):
 
+        self.update_messenger()
+
         if self.running_game.is_set():
             self.log("UI asks 'update data'.", level=1)
             self.ask_interface("update_tables", self.get_current_data())
@@ -289,6 +304,12 @@ class Controller(Thread, Logger):
         else:
 
             self.ask_interface("force_to_quit_game")
+
+    def ui_new_message(self, user_name, message):
+
+        self.log("Got new message from ui for {}: '{}'.".format(user_name, message))
+        self.server.wait_event.set()
+        self.server_queue.put(("send_message", user_name, message))
 
     def ui_php_run_game(self):
 

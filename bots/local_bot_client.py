@@ -13,6 +13,9 @@ class HotellingLocalBots(Logger, Thread):
     with open("hotelling_server/parameters/game.json") as f:
         game_parameters = json.load(f)
 
+    with open("hotelling_server/parameters/parametrization.json") as f:
+        parametrization = json.load(f)
+
     def __init__(self, controller, n_firms, n_customers, n_agents_to_wait):
         super().__init__()
         
@@ -25,6 +28,8 @@ class HotellingLocalBots(Logger, Thread):
         self.n_customers = n_customers
         self.n_firms = n_firms
         self.n_agents_to_wait = n_agents_to_wait
+
+        self.customer_extra_view = self.parametrization["customer_view"]
 
         self.customer_attributes = {}
         self.firm_attributes = {}
@@ -110,6 +115,8 @@ class HotellingLocalBots(Logger, Thread):
 
         for game_id, server_id, role, bot in self.data.assignment:                
 
+            # --------------- init customers ------------------------------------ # 
+
             if bot and role == "customer":
 
                 self.n_agents_to_wait += 1
@@ -123,6 +130,8 @@ class HotellingLocalBots(Logger, Thread):
 
                     self.data.roles[game_id] = "customer"
                     self.data.current_state["time_since_last_request_customers"][customer_id] = " ✔ "
+
+            # --------------- init firms ------------------------------------ # 
 
             if bot and role == "firm":
 
@@ -162,8 +171,8 @@ class HotellingLocalBots(Logger, Thread):
                 extra_view, firm = self.customer_choice(customer_id)
 
                 self.data.current_state["customer_extra_view_choices"][customer_id] = extra_view
-                self.data.current_state["customer_firm_choices"][customer_id] = firm
 
+                self.data.current_state["customer_firm_choices"][customer_id] = firm
                 self.data.current_state["customer_replies"][customer_id] = 1
 
                 self.data.current_state["customer_states"][customer_id] = "ask_customer_choice_recording"
@@ -187,8 +196,7 @@ class HotellingLocalBots(Logger, Thread):
 
     def customer_extra_view_choice(self):
 
-        self.customer_attributes["extra_view_choice"] = \
-            np.max(self.customer_attributes["extra_view_possibilities"])
+        self.customer_attributes["extra_view_choice"] = self.customer_extra_view
 
         return self.customer_attributes["extra_view_choice"]
 
@@ -205,19 +213,14 @@ class HotellingLocalBots(Logger, Thread):
         available_prices = prices[cond0 * cond1]
         available_positions = positions[cond0 * cond1]
 
-        if len(available_prices) == 1:
-            self.customer_attributes["min_price"] = min(available_prices)
-            cond0 = np.where(available_prices == prices)
-            cond1 = np.where(available_positions == positions)
-            firm_choice = np.intersect1d(cond0, cond1)
+        if len(available_positions) == 1:
+            firm_choice = np.where(positions == available_positions)[0][0]
 
         elif len(available_prices) == 2:
-            distance = [abs(own_position - pos) for pos in available_positions]
-            firms = [i + j for i, j in zip(available_prices, distance)]
-            firm_choice = np.random.randint(2) if firms[0] == firms[1] else np.argmin(firms)
+            firm_choice = np.random.randint(2) if available_prices[0] == available_prices[1] \
+                else np.argmin(available_prices)
 
         else:
-            self.customer_attributes["min_price"] = 0
             firm_choice = -1
 
         return firm_choice

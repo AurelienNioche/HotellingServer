@@ -5,7 +5,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget, QMenuBar
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
         setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
-        erase_sql_tables_view
+        erase_sql_tables_view, messenger
 
 from utils.utils import Logger
 
@@ -35,7 +35,7 @@ class UI(QWidget, Logger):
         self.param = dict()
         self.old_param = dict()
 
-        # refresh interface and update data (tables, figures) 
+        # refresh interface and update data (tables, figures, messenger) 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
 
@@ -99,6 +99,10 @@ class UI(QWidget, Logger):
 
     def update_participants(self, participants):
         self.frames["assign_php"].update_participants(participants)
+
+    def controller_new_message(self, args):
+
+        self.menubar_frames["messenger"].new_message_from_user(args[0], args[1])
 
     # ----------------- called by views methods -------------------------------------------------------- # 
     def save_parameters(self, key, data):
@@ -165,12 +169,15 @@ class UI(QWidget, Logger):
         # ------------------- Menu bar frames ---------------------------- # 
 
         self.menubar_frames["config_files"] = \
-                config_files_view.ConfigFilesWindow(parent=self,
-                param=self._get_parameters("parametrization", "network", "game", "sql_tables", "folders"))
+            config_files_view.ConfigFilesWindow(parent=self,
+            param=self._get_parameters("parametrization", "network", "game", "sql_tables", "folders"))
 
         self.menubar_frames["erase_sql_tables"] = \
-                erase_sql_tables_view.EraseSQLTablesFrame(parent=self,
-                param=self._get_parameters("sql_tables"))
+            erase_sql_tables_view.EraseSQLTablesFrame(parent=self,
+            param=self._get_parameters("sql_tables"))
+
+        self.menubar_frames["messenger"] = \
+            messenger.MessengerFrame(parent=self)
 
         # ---------------------------------------------------------------- # 
     
@@ -240,12 +247,18 @@ class UI(QWidget, Logger):
 
             self.save_geometry()
             self.log("Close window")
+            self.close_menubar_windows()
             self.close_window()
             event.accept()
 
         else:
             self.log("Ignore close window.")
             event.ignore()
+
+    def close_menubar_windows(self):
+
+        for win in self.menubar_frames.values():
+            win.close()
 
     def save_geometry(self):
 
@@ -384,6 +397,10 @@ class UI(QWidget, Logger):
     def show_menubar_frame_erase_sql_tables(self):
 
         self.menubar_frames["erase_sql_tables"].show()
+
+    def show_menubar_frame_messenger(self):
+
+        self.menubar_frames["messenger"].show()
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):
         """question with customs buttons"""
@@ -585,6 +602,9 @@ class UI(QWidget, Logger):
     
     def set_server_parameters(self, param):
         self.controller_queue.put(("ui_set_server_parameters", param))
+
+    def send_message_to_user(self, user, msg):
+        self.controller_queue.put(("ui_new_message", user, msg))
 
     # ---------------------- #
 
