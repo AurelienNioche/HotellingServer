@@ -1,7 +1,7 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QPushButton, QTableWidget, QTableWidgetItem, \
-    QHeaderView, QVBoxLayout, QLabel, QAbstractItemView
+    QHeaderView, QVBoxLayout, QLabel
 import numpy as np
 
 from hotelling_server.graphics.widgets.plot_layouts import PlotLayout
@@ -115,7 +115,7 @@ class GameFrame(QWidget, Logger):
         self.log("Preparation done!")
 
     def _prepare_address_label(self):
-        
+
         self.address_label.setText(self.address_text)
         font = QFont()
         font.setPointSize(20)
@@ -182,7 +182,7 @@ class GameFrame(QWidget, Logger):
                 rows=[(name, game_id) for game_id, name, role, bot in self.assignment if role == key]
             )
 
-    # -------------------------------------- These methods need to be moved elsewhere ------------------------- # 
+    # -------------------------------------- These methods need to be moved elsewhere ------------------------- #
 
     @staticmethod
     def _get_labels(role):
@@ -223,7 +223,7 @@ class GameFrame(QWidget, Logger):
     # ----------------------------------------------------------------------------------------------- # 
 
     def update_tables(self, parameters):
-        
+
         ids = {}
 
         for role in self.table_layout.keys():

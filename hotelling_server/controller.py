@@ -211,12 +211,14 @@ class Controller(Thread, Logger):
 
     def ui_set_server(self, server_class):
         self.log("Server's class: {}".format(server_class), level=1)
+
         self.server = server_class(controller=self)
         self.server_queue = self.server.queue
+
         self.init.set_server_class(server_class)
         self.ask_interface("set_server_class_parametrization_frame", server_class)
         self.ask_interface("enable_server_related_menubar")
-    
+
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param), level=1)
         self.server.setup(param)
@@ -301,8 +303,7 @@ class Controller(Thread, Logger):
     def ui_new_message(self, user_name, message):
 
         self.log("Got new message from ui for {}: '{}'.".format(user_name, message))
-        self.server.wait_event.set()
-        self.server_queue.put(("send_message", user_name, message))
+        self.server.msg_queue.put(("send_message", user_name, message))
 
     def ui_php_run_game(self):
 

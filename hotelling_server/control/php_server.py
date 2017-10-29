@@ -18,6 +18,7 @@ class PHPServer(Thread, Logger):
         self.cont = controller
 
         self.queue = Queue()
+        self.msg_queue = Queue()
 
         self.clients = {}
 
@@ -42,14 +43,8 @@ class PHPServer(Thread, Logger):
             self.log("I received msg '{}'.".format(msg), level=1)
 
             if msg and msg[0] == "Go":
-                
-                self.wait_event.clear()
-                self.serve()
-
-            if msg and msg[0] == "send_message":
 
                 self.wait_event.clear()
-                self.send_message(msg[1], msg[2])
                 self.serve()
 
         self.log("I'm dead.")
@@ -67,10 +62,65 @@ class PHPServer(Thread, Logger):
 
             if response.text and response.text.split("&")[0] == "waiting_list":
             
+
                 participants = [i for i in response.text.split("&")[1:] if i]
                 break
 
         return participants
+
+    def get_users(self):
+
+        while True:
+
+            self.log("I will ask the distant server to the 'users' table.")
+
+            response = self.send_request(
+                demand_type="reading",
+                table="users"
+            )
+
+            if response.text and response.text.split("&")[0] == "users":
+            
+                users = [i.split("#") for i in response.text.split("&")[1:] if i]
+                break
+
+        return users 
+
+    def register_users(self, usernames, passwords):
+
+        while True:
+
+            self.log("I will ask the distant server to write the 'users' table.")
+
+            response = self.send_request(
+                demand_type="writing",
+                table="users",
+                names=usernames,
+                passwords=passwords
+            )
+
+            self.log("I got the response '{}' from the distant server.".format(response.text))
+
+            if response.text == "I inserted users in 'users' table.":
+                break
+
+    def register_waiting_list(self, usernames):
+
+        while True:
+
+            self.log("I will ask the distant server to write the 'waiting_list' table.")
+
+            response = self.send_request(
+                demand_type="writing",
+                table="waiting_list",
+                names=usernames,
+            )
+
+            self.log("I got the response '{}' from the distant server.".format(response.text))
+
+
+            if response.text == "I inserted names in 'waiting_list' table.":
+                break
 
     def authorize_participants(self, participants, roles, game_ids):
 
@@ -123,6 +173,8 @@ class PHPServer(Thread, Logger):
 
         while not self.wait_event.is_set():
 
+            self.treat_messenger_requests()
+
             response = self.send_request(
                 demand_type="reading",
                 table="request"
@@ -140,9 +192,20 @@ class PHPServer(Thread, Logger):
                     self.log("I will treat {} request(s).".format(len(requests)))
                     self.treat_requests(n_requests=len(requests))
 
-            # check for new msg
-            self.receive_messages()
-            
+    def treat_messenger_requests(self):
+
+        # check for new msg received
+        self.receive_messages()
+
+        # check for new msg to send
+        if not self.msg_queue.empty():
+
+            msg = self.msg_queue.get()
+
+            if msg and msg[0] == "send_message":
+
+                self.send_message(msg[1], msg[2])
+
     def treat_requests(self, n_requests):
 
         for i in range(n_requests):
