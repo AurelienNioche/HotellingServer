@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QPushButton, QFormLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,\
+        QPushButton, QFormLayout, QLabel, QGroupBox
 from PyQt5.QtCore import Qt
 
 
@@ -15,6 +16,8 @@ class EraseSQLTablesFrame(QWidget):
         self.tables = param["sql_tables"]["table_names"]
 
         self.tables_check_boxes = dict()
+
+        self.tables_group = QGroupBox("Select tables")
 
         self.ok_button = QPushButton("Ok")
         self.cancel_button = QPushButton("Cancel")
@@ -42,12 +45,14 @@ class EraseSQLTablesFrame(QWidget):
         form_layout.setAlignment(Qt.AlignCenter)
         form_layout.setLabelAlignment(Qt.AlignCenter)
 
+        self.tables_group.setLayout(form_layout)
+
         horizontal_layout = QHBoxLayout()
 
         horizontal_layout.addWidget(self.ok_button, alignment=Qt.AlignRight)
         horizontal_layout.addWidget(self.cancel_button, alignment=Qt.AlignRight)
 
-        self.layout.addLayout(form_layout)
+        self.layout.addWidget(self.tables_group)
         self.layout.addLayout(horizontal_layout)
 
         self.setLayout(self.layout)
