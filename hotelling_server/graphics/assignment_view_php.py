@@ -1,8 +1,10 @@
 from PyQt5.QtCore import Qt, QObject, QEvent
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
-    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QMessageBox, QFormLayout, QDialog
+    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, \
+    QScrollArea, QMessageBox, QFormLayout, QDialog, QGroupBox
 
 from utils.utils import Logger
+
 
 
 class AssignmentFramePHP(Logger, QWidget):
@@ -28,6 +30,11 @@ class AssignmentFramePHP(Logger, QWidget):
         self.group.addButton(self.next_button)
         self.group.addButton(self.scan_button)
         self.group.addButton(self.erase_tables_button)
+        
+        # assignments widgets (list of game id, server id, role, bot)
+        self.list_group = QGroupBox("Set assignments")
+        self.list_widget = QWidget()
+        self.list_scroll_area = QScrollArea()
 
         self.parameters = dict()
 
@@ -56,6 +63,9 @@ class AssignmentFramePHP(Logger, QWidget):
         # --------- fill layout ----------------------------------- #
 
         self.fill_layout(labels, n_agents)
+
+        self.list_scroll_area.setFixedHeight(500)
+        self.list_scroll_area.setFixedWidth(500)
 
         # noinspection PyUnresolvedReferences
         self.next_button.clicked.connect(self.push_next_button)
@@ -92,7 +102,15 @@ class AssignmentFramePHP(Logger, QWidget):
         horizontal_layout.addWidget(self.previous_button, alignment=Qt.AlignCenter)
         horizontal_layout.addWidget(self.next_button, alignment=Qt.AlignCenter)
         
-        self.layout.addLayout(grid_layout)
+        self.list_widget.setLayout(grid_layout)
+        self.list_scroll_area.setWidget(self.list_widget)
+
+        list_scroll_area_layout = QHBoxLayout()
+        list_scroll_area_layout.addWidget(self.list_scroll_area)
+
+        self.list_group.setLayout(list_scroll_area_layout)
+
+        self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
         
         self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
@@ -109,13 +127,17 @@ class AssignmentFramePHP(Logger, QWidget):
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
-            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self, value=i, idx=i, greyed=False, event=False)
+            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self, 
+                value=i, idx=i, greyed=False, event=False)
             
-            self.parameters["assign"][i]["server_id"] = IntParameter(parent=self, value="Bot", idx=i, greyed=True, event=True)
+            self.parameters["assign"][i]["server_id"] = IntParameter(parent=self,
+                value="Bot", idx=i, greyed=True, event=True)
 
-            self.parameters["assign"][i]["role"] = RadioParameter(parent=self, checked=roles[i], idx=i)
+            self.parameters["assign"][i]["role"] = RadioParameter(parent=self,
+                checked=roles[i], idx=i)
 
-            self.parameters["assign"][i]["bot"] = CheckParameter(parent=self, checked=True, idx=i)
+            self.parameters["assign"][i]["bot"] = CheckParameter(parent=self,
+                checked=True, idx=i)
 
     # ---------------------- PUSH BUTTONS --------------------------------- #
 
