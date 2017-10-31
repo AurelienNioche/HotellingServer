@@ -17,8 +17,8 @@ class PHPServer(Thread, Logger):
 
         self.cont = controller
 
-        self.queue = Queue()
-        self.msg_queue = Queue()
+        self.main_queue = Queue()
+        self.side_queue = Queue()
 
         self.clients = {}
 
@@ -39,7 +39,7 @@ class PHPServer(Thread, Logger):
         while not self.shutdown_event.is_set():
 
             self.log("Waiting for a message...", level=1)
-            msg = self.queue.get()
+            msg = self.main_queue.get()
             self.log("I received msg '{}'.".format(msg), level=1)
 
             if msg and msg[0] == "Go":
@@ -62,7 +62,6 @@ class PHPServer(Thread, Logger):
 
             if response.text and response.text.split("&")[0] == "waiting_list":
             
-
                 participants = [i for i in response.text.split("&")[1:] if i]
                 break
 
@@ -124,10 +123,6 @@ class PHPServer(Thread, Logger):
 
     def authorize_participants(self, participants, roles, game_ids):
 
-        names = json.dumps(participants)
-        game_ids = json.dumps(game_ids)
-        roles = json.dumps(roles)
-
         while True:
 
             self.log("I will ask the distant server to fill the 'participants' table with {}".format(participants))
@@ -135,9 +130,9 @@ class PHPServer(Thread, Logger):
             response = self.send_request(
                 demand_type="writing",
                 table="participants",
-                gameIds=game_ids,
-                names=names,
-                roles=roles
+                gameIds=json.dumps(game_ids),
+                names=json.dumps(participants),
+                roles=json.dumps(roles)
             )
 
             self.log("I got the response '{}' from the distant server.".format(response.text))
@@ -161,6 +156,23 @@ class PHPServer(Thread, Logger):
             if "Tables" in response.text and "have been erased" in response.text:
                 break
 
+    def set_missing_players(self, value):
+
+        while True:
+
+            self.log("I will ask the distant server to update the 'missing_players' variable with {}".format(value))
+
+            response = self.send_request(
+                demand_type="writing",
+                table="game",
+                missingPlayers=value
+            )
+
+            self.log("I got the response '{}' from the distant server.".format(response.text))
+
+            if response.text == "I updated missing players in 'game' table.":
+                break
+
     def send_request(self, **kwargs):
 
         return rq.get(self.server_address, params=kwargs)
@@ -173,7 +185,7 @@ class PHPServer(Thread, Logger):
 
         while not self.wait_event.is_set():
 
-            self.treat_messenger_requests()
+            self.treat_sides_requests()
 
             response = self.send_request(
                 demand_type="reading",
@@ -181,7 +193,6 @@ class PHPServer(Thread, Logger):
             )
 
             if response.text and response.text.split("&")[0] == "request":
-
 
                 requests = [i for i in response.text.split("&")[1:] if i]
 
@@ -192,19 +203,23 @@ class PHPServer(Thread, Logger):
                     self.log("I will treat {} request(s).".format(len(requests)))
                     self.treat_requests(n_requests=len(requests))
 
-    def treat_messenger_requests(self):
+    def treat_sides_requests(self):
 
         # check for new msg received
         self.receive_messages()
 
-        # check for new msg to send
-        if not self.msg_queue.empty():
+        # check for new interactions with sql tables
+        if not self.side_queue.empty():
 
-            msg = self.msg_queue.get()
+            msg = self.side_queue.get()
 
             if msg and msg[0] == "send_message":
 
                 self.send_message(msg[1], msg[2])
+
+            elif msg and msg[0] == "erase_sql_tables":
+
+                self.ask_for_erasing_tables(tables=msg[1:])
 
     def treat_requests(self, n_requests):
 
@@ -212,7 +227,7 @@ class PHPServer(Thread, Logger):
 
             self.log("I'm treating the request no {}.".format(i))
 
-            should_be_reply, response = self.queue.get()
+            should_be_reply, response = self.main_queue.get()
 
             if should_be_reply == "reply":
 
@@ -280,5 +295,5 @@ class PHPServer(Thread, Logger):
 
     def end(self):
         self.shutdown_event.set()
-        self.queue.put("break")
+        self.main_queue.put("break")
 

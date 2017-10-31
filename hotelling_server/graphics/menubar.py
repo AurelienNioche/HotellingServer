@@ -17,6 +17,7 @@ class MenuBar(QMenuBar, Logger):
         self.show_config_files = QAction("Edit config files", self)
         self.erase_sql_tables = QAction("Erase sql tables", self)
         self.messenger = QAction("Chat with strangers", self)
+        self.missing_players = QAction("Set missing players", self)
 
         self.setup_edit()
         self.setup_action()
@@ -40,10 +41,16 @@ class MenuBar(QMenuBar, Logger):
         self.messenger.setEnabled(False)
         self.action_menu.addAction(self.messenger)
 
+        # Missing Players
+        self.missing_players.triggered.connect(self.parent().show_menubar_frame_missing_players)
+        self.missing_players.setEnabled(False)
+        self.action_menu.addAction(self.missing_players)
+
     def enable_actions(self):
 
         self.erase_sql_tables.setEnabled(True)
         self.messenger.setEnabled(True)
+        self.missing_players.setEnabled(True)
 
 
 

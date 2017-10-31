@@ -5,7 +5,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QMessageBox, QDesktopWidget, QMenuBar
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
         setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
-        erase_sql_tables_view, messenger
+        erase_sql_tables_view, messenger, missing_players_view
 
 from utils.utils import Logger
 
@@ -97,8 +97,8 @@ class UI(QWidget, Logger):
         self.log("Controller asks 'stop scanning network'")
         self.frames["devices"].show_device_added()
 
-    def update_participants(self, participants):
-        self.frames["assign_php"].update_participants(participants)
+    def update_waiting_list_assignment_frame(self, participants):
+        self.frames["assign_php"].update_waiting_list(participants)
 
     def controller_new_message(self, args):
 
@@ -183,6 +183,10 @@ class UI(QWidget, Logger):
         self.menubar_frames["messenger"] = \
             messenger.MessengerFrame(parent=self)
 
+        self.menubar_frames["missing_players"] = \
+            missing_players_view.MissingPlayersFrame(parent=self,
+            param=self._get_parameters("game"))
+
         # ---------------------------------------------------------------- # 
     
     def prepare_window(self):
@@ -212,10 +216,16 @@ class UI(QWidget, Logger):
 
                 self.check_for_saving_parameters()
 
+            self.check_for_erasing_tables()
+
             self.save_geometry()
             self.log("Close window")
             self.close_menubar_windows()
+
+            # stop timers
             self.timer.stop()
+            self.frames["assign_php"].timer.stop()
+
             self.close_window()
             event.accept()
 
@@ -231,6 +241,16 @@ class UI(QWidget, Logger):
     def save_geometry(self):
 
         self.settings.setValue("geometry", self.saveGeometry())
+
+    def check_for_erasing_tables(self):
+        
+        tables = "participants", "waiting_list", "request", "response"
+
+        if self.show_question("Do you want to erase tables '{}'?".format(tables)):
+            self.php_erase_sql_tables(tables=tables)
+        else:
+
+            self.log('Erasing tables aborted.')
 
     def check_for_saving_parameters(self):
 
@@ -369,6 +389,10 @@ class UI(QWidget, Logger):
     def show_menubar_frame_messenger(self):
 
         self.menubar_frames["messenger"].show()
+
+    def show_menubar_frame_missing_players(self):
+
+        self.menubar_frames["missing_players"].show()
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):
         """question with customs buttons"""
@@ -574,6 +598,8 @@ class UI(QWidget, Logger):
     def send_message_to_user(self, user, msg):
         self.controller_queue.put(("ui_new_message", user, msg))
 
+    def set_missing_players(self, value):
+        self.controller_queue.put(("ui_php_set_missing_players", value))
     # ---------------------- #
 
     

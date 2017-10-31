@@ -213,7 +213,7 @@ class Controller(Thread, Logger):
         self.log("Server's class: {}".format(server_class), level=1)
 
         self.server = server_class(controller=self)
-        self.server_queue = self.server.queue
+        self.server_queue = self.server.main_queue
 
         self.init.set_server_class(server_class)
         self.ask_interface("set_server_class_parametrization_frame", server_class)
@@ -303,7 +303,7 @@ class Controller(Thread, Logger):
     def ui_new_message(self, user_name, message):
 
         self.log("Got new message from ui for {}: '{}'.".format(user_name, message))
-        self.server.msg_queue.put(("send_message", user_name, message))
+        self.server.side_queue.put(("send_message", user_name, message))
 
     def ui_php_run_game(self):
 
@@ -338,15 +338,25 @@ class Controller(Thread, Logger):
         else:
             participants = waiting_list[:n_player]
 
-        self.ask_interface("update_participants", participants)
+        self.ask_interface("update_waiting_list_assignment_frame", participants)
 
     def ui_php_erase_sql_tables(self, tables):
         
         if self.server is not None and self.server.server_address is not None:
-            self.server.ask_for_erasing_tables(tables)
+
+            if self.running_server.is_set():
+                self.server.side_queue.put(("erase_sql_tables", tables))
+            else:
+                self.server.ask_for_erasing_tables(tables)
         else:
             self.ask_interface("show_warning", "Server is not configured!")
-    
+
+    def ui_php_set_missing_players(self, value):
+
+        if self.server is not None and self.server.server_address is not None:
+
+            self.server.set_missing_players(value)
+
     # ------------------------------ Time Manager interface ------------------------------------ #
 
     def time_manager_stop_game(self):

@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
     QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, \
     QScrollArea, QMessageBox, QFormLayout, QDialog, QGroupBox
 
+from threading import Thread, Event
+
 from utils.utils import Logger
 
 
@@ -21,14 +23,13 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.next_button = QPushButton("Next")
         self.previous_button = QPushButton("Previous")
-        self.scan_button = QPushButton("Look for new participants...")
         self.erase_tables_button = QPushButton("Erase SQL tables")
+        self.missing_players_button = QPushButton("Set missing players")
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
-        self.group.addButton(self.scan_button)
         self.group.addButton(self.erase_tables_button)
         
         # assignments widgets (list of game id, server id, role, bot)
@@ -36,6 +37,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.list_widget = QWidget()
         self.list_scroll_area = QScrollArea()
 
+        self.timer = None 
         self.parameters = dict()
 
         self.error = None
@@ -72,9 +74,9 @@ class AssignmentFramePHP(Logger, QWidget):
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
         # noinspection PyUnresolvedReferences
-        self.scan_button.clicked.connect(self.push_scan_button)
-        # noinspection PyUnresolvedReferences
         self.erase_tables_button.clicked.connect(self.push_erase_tables_button)
+        # noinspection PyUnresolvedReferences
+        self.missing_players_button.clicked.connect(self.push_missing_players_button)
 
         self.setup_done = True
 
@@ -113,8 +115,8 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
         
-        self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
         self.layout.addWidget(self.erase_tables_button, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.missing_players_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
@@ -123,15 +125,17 @@ class AssignmentFramePHP(Logger, QWidget):
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
         self.setFocus()
+        self.timer = Timer(self, self.ask_for_updating_waiting_list, 1000)
+        self.timer.start()
 
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
             self.parameters["assign"][i]["game_id"] = IntParameter(parent=self, 
-                value=i, idx=i, greyed=False, event=False)
+                value=i, idx=i)
             
             self.parameters["assign"][i]["server_id"] = IntParameter(parent=self,
-                value="Bot", idx=i, greyed=True, event=True)
+                value="Bot", idx=i)
 
             self.parameters["assign"][i]["role"] = RadioParameter(parent=self,
                 checked=roles[i], idx=i)
@@ -155,6 +159,7 @@ class AssignmentFramePHP(Logger, QWidget):
             self.parent().save_parameters("assignment_php", self.param["assignment_php"])
             self.parent().set_assignment(assignment=self.param["assignment_php"])
             self.parent().show_frame_parametrization()
+            self.timer.stop()
 
     def push_previous_button(self):
 
@@ -166,12 +171,6 @@ class AssignmentFramePHP(Logger, QWidget):
             self.log("Push 'previous' button.")
             self.parent().show_frame_load_game_new_game_php()
 
-    def push_scan_button(self):
-
-        self.scan_button.setEnabled(False)
-
-        self.parent().php_scan_button()
-
     def push_erase_tables_button(self):
 
         self.erase_tables_button.setEnabled(False)
@@ -179,9 +178,19 @@ class AssignmentFramePHP(Logger, QWidget):
         self.parent().show_menubar_frame_erase_sql_tables()
 
         self.erase_tables_button.setEnabled(True)
-    # ------------------------------------------------------------------------------- #
 
-    def update_participants(self, participants):
+    def push_missing_players_button(self):
+
+        self.missing_players_button.setEnabled(False)
+
+        self.parent().show_menubar_frame_missing_players()
+
+        self.missing_players_button.setEnabled(True)
+    # ------------------------------------------------------------------------------- #
+    def ask_for_updating_waiting_list(self):
+        self.parent().php_scan_button()
+
+    def update_waiting_list(self, participants):
         
         if participants:
 
@@ -196,8 +205,6 @@ class AssignmentFramePHP(Logger, QWidget):
             # if not participants reset server_id widget
             for line in self.parameters["assign"]:
                 self.disable_line_edit(line["server_id"].edit)
-
-        self.scan_button.setEnabled(True)
 
     # ----------------------------- assignment validity checking -------------------------------------------------- #
 
@@ -264,28 +271,23 @@ class AssignmentFramePHP(Logger, QWidget):
             check_box = self.parameters["assign"][idx]["bot"].check_box  # check box widget (bot or not)
 
             # if line edit (containing server ids) is not enabled
-            if not line_edit.isEnabled():
+            if not line_edit.isEnabled() and from_line :
                 self.enable_line_edit(line_edit, check_box)
 
             # if line edit is enabled and signal comes from check box
-            elif line_edit.isEnabled() and not from_line:
+            elif not line_edit.isEnabled() and not from_line:
                 self.disable_line_edit(line_edit)
 
     @staticmethod
     def disable_line_edit(line_edit):
 
         line_edit.setText("Bot")
-        line_edit.setEnabled(False)
-        line_edit.setStyleSheet(line_edit.greyed_style)
 
     @staticmethod
     def enable_line_edit(line_edit, check_box, name=""):
 
         check_box.setChecked(False)
-        line_edit.setEnabled(True)
         line_edit.setText(name)
-        line_edit.setStyleSheet("")
-        line_edit.setFocus(True)
 
     # --------------------------------- Widgets used in assignment menu --------------------------------- #
 
@@ -333,28 +335,16 @@ class RadioParameter(object):
 class IntParameter(object):
     """game_id and server_id"""
 
-    def __init__(self, parent, value, idx, greyed, event):
+    def __init__(self, parent, value, idx):
 
         self.idx = idx
         self.edit = QLineEdit(str(value))
-        self.edit.greyed_style = '''color: #808080;
-                              background-color: #F0F0F0;
-                              border: 1px solid #B0B0B0;
-                              border-radius: 2px;'''
 
-        self.filter = MouseClick(parent=parent, idx=idx)
-        self.setup(greyed, event)
+        self.setup()
 
-    def setup(self, greyed, event):
+    def setup(self):
         
-        if greyed:
-            self.edit.setEnabled(False)
-            self.edit.setStyleSheet(self.edit.greyed_style)
-        else:
-            self.edit.setEnabled(True)
-
-        if event:
-            self.edit.installEventFilter(self.filter)
+        self.edit.setEnabled(False)
 
     def get_value(self):
 
@@ -420,3 +410,26 @@ class MouseClick(QObject):
                 return True
 
         return False
+
+
+class Timer(Thread):
+    def __init__(self, parent, func, interval):
+        super().__init__()
+        self.interval = interval
+        self.func = func
+        self._parent = parent
+
+    def stop(self):
+        self._is_stopped = True
+
+    def stopped(self):
+        return self._is_stopped
+
+    def parent(self):
+        return self._parent
+
+    def run(self):
+        while not self.stopped():
+            self.func()
+            Event().wait(3)
+
