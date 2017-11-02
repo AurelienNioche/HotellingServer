@@ -1,5 +1,5 @@
 from multiprocessing import Queue, Event
-from threading import Thread, Timer
+from threading import Thread, Event
 import requests as rq
 import time
 import json
@@ -10,6 +10,7 @@ from utils.utils import Logger
 class PHPServer(Thread, Logger):
 
     name = "PHPServer"
+    request_frequence = 0.2
 
     def __init__(self, controller):
 
@@ -42,10 +43,15 @@ class PHPServer(Thread, Logger):
             msg = self.main_queue.get()
             self.log("I received msg '{}'.".format(msg), level=1)
 
-            if msg and msg[0] == "Go":
-
+            if msg and msg[0] == "game":
+                
                 self.wait_event.clear()
                 self.serve()
+
+            elif msg and msg[0] == "messenger":
+
+                while not self.wait_event.is_set():
+                    self.treat_sides_requests()
 
         self.log("I'm dead.")
 
@@ -53,7 +59,7 @@ class PHPServer(Thread, Logger):
 
         while True:
 
-            self.log("I will ask the distant server to the 'waiting_list' table.")
+            self.log("I will ask the distant server to the 'waiting_list' table.", level=1)
 
             response = self.send_request(
                 demand_type="reading",
@@ -174,12 +180,20 @@ class PHPServer(Thread, Logger):
                 break
 
     def send_request(self, **kwargs):
+        
+        try:
+            return rq.get(self.server_address, params=kwargs)
 
-        return rq.get(self.server_address, params=kwargs)
+        except ConnectionError:
+            self.log("I got a connection error. Try again.", level=0)
     
     def send_request_messenger(self, **kwargs):
 
-        return rq.post(self.server_address_messenger, data=kwargs)
+        try:
+            return rq.post(self.server_address_messenger, data=kwargs)
+
+        except ConnectionError:
+            self.log("I got a connection error. Try again.", level=0)
 
     def serve(self):
 
@@ -203,7 +217,11 @@ class PHPServer(Thread, Logger):
                     self.log("I will treat {} request(s).".format(len(requests)))
                     self.treat_requests(n_requests=len(requests))
 
+            Event().wait(self.request_frequence)
+
     def treat_sides_requests(self):
+
+        self.log("Treating sides requests such as msg or table erasing demands", level=1)
 
         # check for new msg received
         self.receive_messages()

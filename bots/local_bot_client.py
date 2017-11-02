@@ -1,4 +1,5 @@
 import json
+import pickle
 from threading import Thread, Event
 import numpy as np
 
@@ -12,9 +13,9 @@ class HotellingLocalBots(Logger, Thread):
 
     with open("hotelling_server/parameters/game.json") as f:
         game_parameters = json.load(f)
-
-    with open("hotelling_server/parameters/parametrization.json") as f:
-        parametrization = json.load(f)
+    
+    with open("hotelling_server/parameters/means.p", "rb") as f:
+        customer_extra_view_means = pickle.load(f)[1]
 
     def __init__(self, controller, n_firms, n_customers, n_agents_to_wait):
         super().__init__()
@@ -28,8 +29,6 @@ class HotellingLocalBots(Logger, Thread):
         self.n_customers = n_customers
         self.n_firms = n_firms
         self.n_agents_to_wait = n_agents_to_wait
-
-        self.customer_extra_view = self.parametrization["customer_view"]
 
         self.customer_attributes = {}
         self.firm_attributes = {}
@@ -59,7 +58,9 @@ class HotellingLocalBots(Logger, Thread):
         self.init()
 
         self.log("Game is starting.")
+        
 
+        # ------------ Game start ------------------------ # 
         while True:
 
             for firm_id in self.data.bot_firms_id.values():
@@ -187,16 +188,16 @@ class HotellingLocalBots(Logger, Thread):
         prices = self.data.current_state["firm_prices"]
         own_position = customer_id + 1
 
-        extra_view = self.customer_extra_view_choice()
+        extra_view = self.customer_extra_view_choice(customer_id)
         firm = self.customer_firm_choice(np.array([positions[0], positions[1]]),
                                          np.array([prices[0], prices[1]]),
                                          own_position)
 
         return extra_view, firm
 
-    def customer_extra_view_choice(self):
+    def customer_extra_view_choice(self, customer_id):
 
-        self.customer_attributes["extra_view_choice"] = self.customer_extra_view
+        self.customer_attributes["extra_view_choice"] = self.customer_extra_view_means[customer_id]
 
         return self.customer_attributes["extra_view_choice"]
 

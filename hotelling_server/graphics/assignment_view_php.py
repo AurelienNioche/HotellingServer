@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
     QScrollArea, QMessageBox, QFormLayout, QDialog, QGroupBox
 
 from threading import Thread, Event
+import numpy as np
 
 from utils.utils import Logger
 
@@ -430,6 +431,10 @@ class Timer(Thread):
 
     def run(self):
         while not self.stopped():
-            self.func()
-            Event().wait(3)
+
+            try:
+                self.func()
+                Event().wait(np.random.randint(4))
+            except:
+                Event().wait(np.random.randint(4))
 

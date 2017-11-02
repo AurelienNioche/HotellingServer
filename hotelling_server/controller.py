@@ -79,6 +79,7 @@ class Controller(Thread, Logger):
         self.running_game.set()
 
         self.start_server()
+        self.server_game_serve()
 
         self.ask_interface("show_frame_game")
 
@@ -134,7 +135,20 @@ class Controller(Thread, Logger):
         if not self.running_server.is_set():
             self.server.start()
 
-        self.server_queue.put(("Go", ))
+        self.running_server.set()
+        self.log("Server running.")
+
+    def server_game_serve(self):
+        
+        # stop the current activity to begin a new one
+        self.server.shutdown()
+        self.server_queue.put(("game", ))
+
+    def server_messenger_serve(self):
+
+        # stop the current activity to begin a new one
+        self.server.shutdown()
+        self.server_queue.put(("messenger", ))
 
     def scan_network_for_new_devices(self):
 
@@ -167,11 +181,6 @@ class Controller(Thread, Logger):
             func()
 
     # ------------------------------ Server interface ----------------------------------------#
-
-    def server_running(self):
-
-        self.log("Server running.")
-        self.running_server.set()
 
     def server_error(self, error_message):
 
@@ -211,10 +220,8 @@ class Controller(Thread, Logger):
 
     def ui_set_server(self, server_class):
         self.log("Server's class: {}".format(server_class), level=1)
-
         self.server = server_class(controller=self)
         self.server_queue = self.server.main_queue
-
         self.init.set_server_class(server_class)
         self.ask_interface("set_server_class_parametrization_frame", server_class)
         self.ask_interface("enable_server_related_menubar")
@@ -222,6 +229,13 @@ class Controller(Thread, Logger):
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param), level=1)
         self.server.setup(param)
+
+        # start server
+        self.start_server()
+
+        # start messenger
+        self.server_messenger_serve()
+
         self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
@@ -264,7 +278,7 @@ class Controller(Thread, Logger):
 
     def ui_retry_server(self):
         self.log("UI ask 'retry server'.")
-        self.server_queue.put(("Go",))
+        self.server_queue.put(("game",))
 
     def ui_write_parameters(self, key, value):
         self.log("UI ask 'write parameters'.")
@@ -291,8 +305,11 @@ class Controller(Thread, Logger):
         self.log("UI asks 'look for alive players'.")
         
         if self.game.is_ended():
-
+            
+            # display start frame
             self.ask_interface("show_frame_start")
+
+            # stop bots and server
             self.stop_server()
             self.game.stop_bots()
 

@@ -31,7 +31,7 @@ class MissingPlayersFrame(QWidget):
         self.fill_layout()
 
         self.missing_player_value.setText(
-                str(self.param["game"]["n_firms"] + self.param["game"]["n_customers"]))
+                str(self.param["game"]["n_firms"]))
 
         self.update_button.clicked.connect(self.push_update_button)
 
@@ -52,6 +52,7 @@ class MissingPlayersFrame(QWidget):
     def push_update_button(self):
         
         self.parent().set_missing_players(self.missing_player_value.text())
+        self.hide()
 
 
 

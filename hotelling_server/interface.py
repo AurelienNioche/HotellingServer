@@ -224,7 +224,9 @@ class UI(QWidget, Logger):
 
             # stop timers
             self.timer.stop()
-            self.frames["assign_php"].timer.stop()
+
+            if getattr(self.frames["assign_php"], "timer"):
+                self.frames["assign_php"].timer.stop()
 
             self.close_window()
             event.accept()
@@ -246,7 +248,7 @@ class UI(QWidget, Logger):
         
         tables = "participants", "waiting_list", "request", "response"
 
-        if self.show_question("Do you want to erase tables '{}'?".format(tables)):
+        if self.show_question("Do you want to erase tables '{}'?".format(tables), focus="Yes"):
             self.php_erase_sql_tables(tables=tables)
         else:
 

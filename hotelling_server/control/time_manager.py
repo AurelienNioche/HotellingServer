@@ -91,5 +91,9 @@ class TimeManager(Logger):
             self.state = "end_game"
             self.controller.queue.put(("time_manager_stop_game", ))
 
+            # empty tables when game is done
+            tables = ("waiting_list", "response", "request", "participants")
+            self.controller.queue.put(("ui_php_erase_sql_tables", tables))
+            
     def stop_as_soon_as_possible(self):
         self.continue_game = False
