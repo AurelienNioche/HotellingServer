@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, \
-    QCheckBox, QLineEdit, QMessageBox, QHBoxLayout, QButtonGroup
+    QCheckBox, QLineEdit, QMessageBox, QHBoxLayout, QButtonGroup, QRadioButton
 from utils.utils import Logger
 
 
@@ -31,7 +31,8 @@ class ParametersFrame(QWidget, Logger):
 
         self.order = ["save",
                       "exploration_cost",
-                      "utility_consumption"]
+                      "utility_consumption",
+                      "condition"]
         
         # These two depends on server class choice
         self.show_frame_assignment = None
@@ -53,6 +54,10 @@ class ParametersFrame(QWidget, Logger):
         self.widgets["utility_consumption"] = \
             IntParameter(text="Utility consumption",
                          initial_value=param["utility_consumption"], value_range=[0, 100])
+
+        self.widgets["condition"] = \
+             IntParameter(text="Transportation Cost (high=1, low=0)", initial_value=0,
+                value_range=[0, 1])
 
         self.fill_layout()
 

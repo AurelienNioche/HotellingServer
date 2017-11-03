@@ -77,12 +77,8 @@ class Controller(Thread, Logger):
         self.fatal_error.clear()
         self.continue_game.set()
         self.running_game.set()
-
-        self.start_server()
-        self.server_game_serve()
-
+        self.server.running_game.set()
         self.ask_interface("show_frame_game")
-
         self.log("Game launched.")
 
     def stop_game_first_phase(self):
@@ -103,7 +99,7 @@ class Controller(Thread, Logger):
         # server if it was not launched
         if self.server_queue is not None:
             self.server_queue.put(("Abort",))
-            self.server.shutdown()
+            self.stop_server()
             self.server.end()
 
         self.shutdown.set()
@@ -111,6 +107,7 @@ class Controller(Thread, Logger):
     def fatal_error_of_communication(self):
 
         if not self.fatal_error.is_set():
+
             self.fatal_error.set()
             self.running_game.clear()
             self.continue_game.clear()
@@ -128,27 +125,17 @@ class Controller(Thread, Logger):
     def stop_server(self):
 
         self.log("Stop server.")
-        self.server.shutdown()
+        self.server.stop_to_serve()
+        self.server.running_game.clear()
 
     def start_server(self):
 
         if not self.running_server.is_set():
             self.server.start()
 
+        self.server_queue.put(("serve", ))
         self.running_server.set()
         self.log("Server running.")
-
-    def server_game_serve(self):
-        
-        # stop the current activity to begin a new one
-        self.server.shutdown()
-        self.server_queue.put(("game", ))
-
-    def server_messenger_serve(self):
-
-        # stop the current activity to begin a new one
-        self.server.shutdown()
-        self.server_queue.put(("messenger", ))
 
     def scan_network_for_new_devices(self):
 
@@ -233,9 +220,6 @@ class Controller(Thread, Logger):
         # start server
         self.start_server()
 
-        # start messenger
-        self.server_messenger_serve()
-
         self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
@@ -245,7 +229,7 @@ class Controller(Thread, Logger):
         self.ask_interface("set_assignment_game_frame", assignment)
 
     def ui_set_parametrization(self, param):
-        self.log("Setting parametrization from interface : {}".format(param), level=1)
+        self.log("Setting parametrization from interface : {}".format(param), level=0)
         self.data.parametrization = param
 
     def ui_tcp_run_game(self):
@@ -309,8 +293,7 @@ class Controller(Thread, Logger):
             # display start frame
             self.ask_interface("show_frame_start")
 
-            # stop bots and server
-            self.stop_server()
+            # stop bots 
             self.game.stop_bots()
 
         else:

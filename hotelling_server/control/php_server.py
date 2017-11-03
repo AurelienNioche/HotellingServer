@@ -7,10 +7,9 @@ import json
 from utils.utils import Logger
 
 
-class PHPServer(Thread, Logger):
+class BasePHPServer(Thread, Logger):
 
-    name = "PHPServer"
-    request_frequence = 0.2
+    request_frequency = 0.2
 
     def __init__(self, controller):
 
@@ -21,12 +20,12 @@ class PHPServer(Thread, Logger):
         self.main_queue = Queue()
         self.side_queue = Queue()
 
-        self.clients = {}
-
         self.shutdown_event = Event()
-        self.wait_event = Event()
+        self.serve_event = Event()
+        self.running_game = Event()
 
         self.server_address = None
+        self.server_address_messenger = None
         self.param = None
 
     def setup(self, param):
@@ -43,17 +42,169 @@ class PHPServer(Thread, Logger):
             msg = self.main_queue.get()
             self.log("I received msg '{}'.".format(msg), level=1)
 
-            if msg and msg[0] == "game":
+            if msg and msg[0] == "serve":
                 
-                self.wait_event.clear()
+                self.serve_event.set()
                 self.serve()
 
-            elif msg and msg[0] == "messenger":
-
-                while not self.wait_event.is_set():
-                    self.treat_sides_requests()
-
         self.log("I'm dead.")
+
+    def serve(self):
+
+        while self.serve_event.is_set():
+
+            self.treat_sides_requests()
+            
+            if self.running_game.is_set(): 
+                self.treat_game_requests()
+
+            Event().wait(self.request_frequency)
+
+    def treat_game_requests(self):
+
+        response = self.send_request(
+            demand_type="reading",
+            table="request"
+        )
+
+        if response.text and response.text.split("&")[0] == "request":
+
+            requests = [i for i in response.text.split("&")[1:] if i]
+
+            if requests:
+                for request in requests:
+                    self.cont.queue.put(("server_request", request))
+
+                self.log("I will treat {} request(s).".format(len(requests)))
+                self.treat_requests(n_requests=len(requests))
+
+    def treat_sides_requests(self):
+
+        self.log("Treating sides requests such as msg or table erasing demands", level=1)
+
+        # check for new msg received
+        self.receive_messages()
+
+        # check for new interactions with sql tables
+        if not self.side_queue.empty():
+
+            msg = self.side_queue.get()
+
+            if msg and msg[0] == "send_message":
+
+                self.send_message(msg[1], msg[2])
+
+            elif msg and msg[0] == "erase_sql_tables":
+
+                self.ask_for_erasing_tables(tables=msg[1:])
+
+    def treat_requests(self, n_requests):
+
+        for i in range(n_requests):
+
+            self.log("I'm treating the request no {}.".format(i))
+
+            should_be_reply, response = self.main_queue.get()
+
+            if should_be_reply == "reply":
+
+                response = self.send_request(
+                    demand_type="writing",
+                    table="response",
+                    gameId=response["game_id"],
+                    response=response["response"]
+                )
+
+                self.log("Response from distant server is: '{}'.".format(response.text))
+
+            elif should_be_reply == "error":
+
+                self.log("I will not send response now (code error is '{}').".format(response))
+
+            else:
+                raise Exception("Something went wrong...")
+
+    def receive_messages(self):
+
+        self.log("I send a request for collecting the messages.", level=1)
+
+        response = self.send_request_messenger(
+            demandType="serverHears",
+            userName="none",
+            message="none"
+        )
+
+        if "reply" in response.text:
+            args = [i for i in response.text.split("/") if i]
+            n_messages = int(args[1])
+
+            self.log("I received {} new message(s).".format(n_messages), level=1)
+
+            if n_messages:
+                for arg in args[2:]:
+                    sep_args = arg.split("<>")
+
+                    user_name, message = sep_args[0], sep_args[1]
+
+                    self.cont.queue.put(("server_new_message", user_name, message))
+
+                    self.log("I send confirmation for message '{}'.".format(arg))
+                    self.send_request_messenger(
+                        demandType="serverReceiptConfirmation",
+                        userName=user_name,
+                        message=message
+                    )
+
+    def send_message(self, user_name, message):
+
+        self.log("I send a message for '{}': '{}'.".format(user_name, message))
+
+        response = self.send_request_messenger(
+            demandType="serverSpeaks",
+            userName=user_name,
+            message=message
+        )
+
+        self.log("I receive: {}".format(response))
+
+    def stop_to_serve(self):
+        self.serve_event.clear()
+
+    def end(self):
+        self.shutdown_event.set()
+        self.main_queue.put("break")
+
+
+class RequestManager:
+
+    def send_request(self, **kwargs):
+        
+        while True:
+            try:
+                return rq.get(self.server_address, params=kwargs)
+
+            except Exception:
+                self.log("I got a connection error. Try again.", level=0)
+                Event().wait(self.request_frequency)
+    
+    def send_request_messenger(self, **kwargs):
+
+        while True:
+            try:
+                return rq.post(self.server_address_messenger, data=kwargs)
+
+            except Exception:
+                self.log("I got a connection error. Try again.", level=0)
+                Event().wait(self.request_frequency)
+
+
+class PHPServer(BasePHPServer, RequestManager):
+
+    name = "PHPServer"
+
+    def __init__(self, controller):
+        
+        super().__init__(controller)
 
     def get_waiting_list(self):
 
@@ -178,140 +329,4 @@ class PHPServer(Thread, Logger):
 
             if response.text == "I updated missing players in 'game' table.":
                 break
-
-    def send_request(self, **kwargs):
-        
-        try:
-            return rq.get(self.server_address, params=kwargs)
-
-        except ConnectionError:
-            self.log("I got a connection error. Try again.", level=0)
-    
-    def send_request_messenger(self, **kwargs):
-
-        try:
-            return rq.post(self.server_address_messenger, data=kwargs)
-
-        except ConnectionError:
-            self.log("I got a connection error. Try again.", level=0)
-
-    def serve(self):
-
-        while not self.wait_event.is_set():
-
-            self.treat_sides_requests()
-
-            response = self.send_request(
-                demand_type="reading",
-                table="request"
-            )
-
-            if response.text and response.text.split("&")[0] == "request":
-
-                requests = [i for i in response.text.split("&")[1:] if i]
-
-                if requests:
-                    for request in requests:
-                        self.cont.queue.put(("server_request", request))
-
-                    self.log("I will treat {} request(s).".format(len(requests)))
-                    self.treat_requests(n_requests=len(requests))
-
-            Event().wait(self.request_frequence)
-
-    def treat_sides_requests(self):
-
-        self.log("Treating sides requests such as msg or table erasing demands", level=1)
-
-        # check for new msg received
-        self.receive_messages()
-
-        # check for new interactions with sql tables
-        if not self.side_queue.empty():
-
-            msg = self.side_queue.get()
-
-            if msg and msg[0] == "send_message":
-
-                self.send_message(msg[1], msg[2])
-
-            elif msg and msg[0] == "erase_sql_tables":
-
-                self.ask_for_erasing_tables(tables=msg[1:])
-
-    def treat_requests(self, n_requests):
-
-        for i in range(n_requests):
-
-            self.log("I'm treating the request no {}.".format(i))
-
-            should_be_reply, response = self.main_queue.get()
-
-            if should_be_reply == "reply":
-
-                response = self.send_request(
-                    demand_type="writing",
-                    table="response",
-                    gameId=response["game_id"],
-                    response=response["response"]
-                )
-
-                self.log("Response from distant server is: '{}'.".format(response.text))
-
-            elif should_be_reply == "error":
-
-                self.log("I will not send response now (code error is '{}').".format(response))
-
-            else:
-                raise Exception("Something went wrong...")
-
-    def receive_messages(self):
-
-        self.log("I send a request for collecting the messages.", level=1)
-
-        response = self.send_request_messenger(
-            demandType="serverHears",
-            userName="none",
-            message="none"
-        )
-
-        if "reply" in response.text:
-            args = [i for i in response.text.split("/") if i]
-            n_messages = int(args[1])
-
-            self.log("I received {} new message(s).".format(n_messages), level=1)
-
-            if n_messages:
-                for arg in args[2:]:
-                    sep_args = arg.split("<>")
-
-                    user_name, message = sep_args[0], sep_args[1]
-
-                    self.cont.queue.put(("server_new_message", user_name, message))
-
-                    self.log("I send confirmation for message '{}'.".format(arg))
-                    self.send_request_messenger(
-                        demandType="serverReceiptConfirmation",
-                        userName=user_name,
-                        message=message
-                    )
-
-    def send_message(self, user_name, message):
-
-        self.log("I send a message for '{}': '{}'.".format(user_name, message))
-
-        response = self.send_request_messenger(
-            demandType="serverSpeaks",
-            userName=user_name,
-            message=message
-        )
-
-        self.log("I receive: {}".format(response))
-
-    def shutdown(self):
-        self.wait_event.set()
-
-    def end(self):
-        self.shutdown_event.set()
-        self.main_queue.put("break")
 

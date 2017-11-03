@@ -15,9 +15,11 @@ class HotellingLocalBots(Logger, Thread):
         game_parameters = json.load(f)
     
     with open("hotelling_server/parameters/means.p", "rb") as f:
-        customer_extra_view_means = pickle.load(f)[1]
+        customer_extra_view_means = pickle.load(f)
 
-    def __init__(self, controller, n_firms, n_customers, n_agents_to_wait):
+    # ---------------------------------------------------------- #
+
+    def __init__(self, controller, n_firms, n_customers, n_agents_to_wait, condition):
         super().__init__()
         
         self.controller = controller
@@ -29,6 +31,9 @@ class HotellingLocalBots(Logger, Thread):
         self.n_customers = n_customers
         self.n_firms = n_firms
         self.n_agents_to_wait = n_agents_to_wait
+        
+        # set condition
+        self.customer_extra_view_means = self.customer_extra_view_means[condition]
 
         self.customer_attributes = {}
         self.firm_attributes = {}
@@ -37,6 +42,8 @@ class HotellingLocalBots(Logger, Thread):
 
         self.customer_attributes["extra_view_possibilities"] = np.arange(0, self.n_positions - 1)
         self.firm_attributes["n_prices"] = self.game_parameters["n_prices"]
+
+    # ---------------------------------------------------------- #
 
     def run(self):
         
@@ -89,6 +96,8 @@ class HotellingLocalBots(Logger, Thread):
 
                     break
 
+    # ---------------------------------------------------------- #
+
     def set_bots_to_end_state(self):
 
         for firm_id in self.data.bot_firms_id.values():
@@ -97,11 +106,15 @@ class HotellingLocalBots(Logger, Thread):
         for customer_id in self.data.bot_customers_id.values():
             self.data.current_state["customer_states"][customer_id] = "end_game"
 
+    # ---------------------------------------------------------- #
+
     def stop(self):
         self._stop_event.set()
 
     def stopped(self):
         return self._stop_event.is_set()
+
+    # ---------------------------------------------------------- #
 
     def get_non_bot_agents(self):
 
@@ -111,6 +124,8 @@ class HotellingLocalBots(Logger, Thread):
         non_bots = [(i, j) for i, j in all_agents if (i, j) not in bots]
 
         return non_bots
+
+    # ---------------------------------------------------------- #
 
     def init(self):
 
@@ -150,6 +165,8 @@ class HotellingLocalBots(Logger, Thread):
 
         self.check_remaining_agents()
 
+    # ---------------------------------------------------------- #
+
     def check_remaining_agents(self):
 
         remaining = len(self.data.roles) - (len(self.data.firms_id) + len(self.data.customers_id))
@@ -182,6 +199,8 @@ class HotellingLocalBots(Logger, Thread):
 
                 self.time_manager.check_state()
 
+    # ---------------------------------------------------------- #
+
     def customer_choice(self, customer_id):
 
         positions = self.data.current_state["firm_positions"]
@@ -195,11 +214,15 @@ class HotellingLocalBots(Logger, Thread):
 
         return extra_view, firm
 
+    # ---------------------------------------------------------- #
+
     def customer_extra_view_choice(self, customer_id):
 
         self.customer_attributes["extra_view_choice"] = self.customer_extra_view_means[customer_id]
 
         return self.customer_attributes["extra_view_choice"]
+
+    # ---------------------------------------------------------- #
 
     def customer_firm_choice(self, positions, prices, own_position):
 
@@ -239,6 +262,8 @@ class HotellingLocalBots(Logger, Thread):
                 self.firm_n_client(firm_id)
                 self.data.current_state["firm_states"][firm_id] = "ask_firm_active_customer_choices"
 
+    # ---------------------------------------------------------- #
+
     def play_passive_firm(self, firm_id):
 
         if self.time_manager.state == "active_has_played_and_all_customers_replied":
@@ -246,6 +271,8 @@ class HotellingLocalBots(Logger, Thread):
                 self.data.current_state["passive_gets_results"] = True
                 self.firm_n_client(firm_id)
                 self.data.current_state["firm_states"][firm_id] = "ask_firm_passive_customer_choices"
+
+    # ---------------------------------------------------------- #
 
     def firm_active_choice_recording(self, firm_id):
 
@@ -257,6 +284,8 @@ class HotellingLocalBots(Logger, Thread):
         self.data.current_state["active_replied"] = True
 
         self.time_manager.check_state()
+
+    # ---------------------------------------------------------- #
 
     def firm_n_client(self, firm_id):
 
