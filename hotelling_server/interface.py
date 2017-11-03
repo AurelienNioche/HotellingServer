@@ -3,6 +3,7 @@ from subprocess import getoutput
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QDesktopWidget, QMenuBar
+
 from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
         setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
         erase_sql_tables_view, messenger, missing_players_view
@@ -211,18 +212,16 @@ class UI(QWidget, Logger, MessageBox):
 
     def closeEvent(self, event):
         
-        answer_is_yes = self.show_question(msg="By quitting, you will erase ('participants', 'response', 'request',"
-                                    "'waiting_list') sql tables.",
-                                    question="Are you sure you want to quit?",
-                                    focus="Yes")
+        msg = "By quitting, you will erase ('participants', 'response', 'request'," "'waiting_list') sql tables."
+        question = "Are you sure you want to quit?"
+        focus = "Yes"
 
-        if self.isVisible() and answer_is_yes:
+        if self.isVisible() and self.show_question(msg=msg, question=question, focus=focus):
 
             if not self.already_asked_for_saving_parameters:
 
                 self.check_for_saving_parameters()
 
-            self.check_for_erasing_tables()
             self.save_geometry()
             self.log("Close window")
             self.close_menubar_windows()
@@ -250,7 +249,6 @@ class UI(QWidget, Logger, MessageBox):
         self.settings.setValue("geometry", self.saveGeometry())
 
     def check_for_erasing_tables(self):
-        
         tables = "participants", "waiting_list", "request", "response"
 
         self.php_erase_sql_tables(tables=tables)
@@ -293,7 +291,7 @@ class UI(QWidget, Logger, MessageBox):
             msg = self.queue.get()
             self.log("I received message '{}'.".format(msg), level=1)
 
-            command = eval("self.{}".format(msg[0]))
+            command = getattr(self, msg[0])
             args = msg[1:]
             if args:
                 command(*args)
@@ -434,6 +432,7 @@ class UI(QWidget, Logger, MessageBox):
         if reply_yes:
             self.show_frame_start()
             self.stop_bots()
+            self.force_to_stop_game()
 
         else:
             self.frames["game"].stop_button.setEnabled(True)
@@ -499,6 +498,9 @@ class UI(QWidget, Logger, MessageBox):
     def stop_game(self):
         self.controller_queue.put(("ui_stop_game", ))
 
+    def force_to_stop_game(self):
+        self.controller_queue.put(("ui_force_to_stop_game", ))
+
     def close_window(self):
         self.controller_queue.put(("ui_close_window", ))
 
@@ -546,6 +548,7 @@ class UI(QWidget, Logger, MessageBox):
 
     def set_missing_players(self, value):
         self.controller_queue.put(("ui_php_set_missing_players", value))
+
     # ---------------------- #
 
     

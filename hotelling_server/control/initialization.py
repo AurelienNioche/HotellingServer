@@ -145,13 +145,20 @@ class Init:
         else:
             firm_id = self.data.firms_id[game_id]
 
-        state, position, price, opp_position, opp_price, profits = self.get_firms_data(firm_id)
+        state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
-        return self.reply(
-            game_id, func_name, self.time_manager.t,
-            position, state, price, opp_position, opp_price, profits)
+        return self.reply(game_id,
+                func_name,
+                self.time_manager.t,
+                position,
+                state,
+                price,
+                opp_position,
+                opp_price,
+                profits,
+                opp_profits)
 
     def get_firms_data(self, firm_id):
 
@@ -161,11 +168,19 @@ class Init:
 
         position = self.data.current_state["firm_positions"][firm_id]
         price = self.data.current_state["firm_prices"][firm_id]
-        opp_position = self.data.current_state["firm_positions"][opponent_id]
-        opp_price = self.data.current_state["firm_prices"][opponent_id]
         profits = self.data.current_state["firm_cumulative_profits"][firm_id]
 
-        return state, position, price, opp_position, opp_price, profits
+        opp_position = self.data.current_state["firm_positions"][opponent_id]
+        opp_price = self.data.current_state["firm_prices"][opponent_id]
+        opp_profits = self.data.current_state["firm_cumulative_profits"][opponent_id]
+
+        return (state,
+                position,
+                price,
+                opp_position,
+                opp_price,
+                profits,
+                opp_profits)
     
     @staticmethod
     def reply_tcp(*args):
@@ -208,3 +223,43 @@ class Init:
         if not remaining:
             self.data.current_state["init_done"] = True
             self.time_manager.check_state()
+
+    # ------------------------------- Admin init ----------------------------------------------------------- # 
+
+    def ask_admin_init(self):
+        
+        # default admin game_id is -1
+        game_id = -1
+        
+        try:
+            firm_0 = self.data.firms_id[0]
+            firm_1 = self.data.firms_id[1]
+
+            state = self.data.current_state["firm_status"][firm_0]
+
+            position = self.data.current_state["firm_positions"][firm_0]
+            price = self.data.current_state["firm_prices"][firm_0]
+            profits = self.data.current_state["firm_cumulative_profits"][firm_0]
+
+            opp_position = self.data.current_state["firm_positions"][firm_1]
+            opp_price = self.data.current_state["firm_prices"][firm_1]
+            opp_profits = self.data.current_state["firm_cumulative_profits"][firm_1]
+
+            return self.reply(
+                game_id, 
+                "ask_admin_init", 
+                self.time_manager.t, 
+                (1, 0)[state == "active"], 
+                position, 
+                price,
+                profits,
+                opp_position,
+                opp_price,
+                opp_profits)
+
+        except:
+            return self.reply("error", "players_are_not_connected_yet")
+
+
+
+

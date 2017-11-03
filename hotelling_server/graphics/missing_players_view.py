@@ -33,7 +33,10 @@ class MissingPlayersFrame(QWidget):
         self.missing_player_value.setText(
                 str(self.param["game"]["n_firms"]))
 
+        # noinspection PyUnresolvedReferences
         self.update_button.clicked.connect(self.push_update_button)
+
+        self.update_button.setDefault(True)
 
     def fill_layout(self):
 

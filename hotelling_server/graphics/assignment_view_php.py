@@ -79,6 +79,9 @@ class AssignmentFramePHP(Logger, QWidget):
         # noinspection PyUnresolvedReferences
         self.missing_players_button.clicked.connect(self.push_missing_players_button)
 
+        self.next_button.setAutoDefault(True)
+        self.next_button.setDefault(True)
+
         self.setup_done = True
 
     def fill_layout(self, labels, n_agents):

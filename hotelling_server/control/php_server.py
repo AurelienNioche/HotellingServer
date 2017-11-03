@@ -9,7 +9,7 @@ from utils.utils import Logger
 
 class BasePHPServer(Thread, Logger):
 
-    request_frequency = 0.2
+    request_frequency = 0.1
 
     def __init__(self, controller):
 
@@ -33,7 +33,7 @@ class BasePHPServer(Thread, Logger):
         self.param = param
         self.server_address = self.param["network"]["php_server"]
         self.server_address_messenger = self.param["network"]["messenger"]
-        
+
     def run(self):
 
         while not self.shutdown_event.is_set():
@@ -80,8 +80,6 @@ class BasePHPServer(Thread, Logger):
 
     def treat_sides_requests(self):
 
-        self.log("Treating sides requests such as msg or table erasing demands", level=1)
-
         # check for new msg received
         self.receive_messages()
 
@@ -95,8 +93,20 @@ class BasePHPServer(Thread, Logger):
                 self.send_message(msg[1], msg[2])
 
             elif msg and msg[0] == "erase_sql_tables":
-
                 self.ask_for_erasing_tables(tables=msg[1:])
+
+            elif msg and msg[0] == "get_waiting_list":
+
+                waiting_list = self.get_waiting_list()
+                self.cont.queue.put(("server_update_assignment_frame", waiting_list))
+
+            elif msg and msg[0] == "authorize_participants":
+
+                self.authorize_participants(*msg[1:])
+
+            elif msg and msg[0] == "set_missing_players":
+
+                self.set_missing_players(msg[1])
 
     def treat_requests(self, n_requests):
 
@@ -172,6 +182,8 @@ class BasePHPServer(Thread, Logger):
 
     def end(self):
         self.shutdown_event.set()
+        self.serve_event.clear()
+
         self.main_queue.put("break")
 
 

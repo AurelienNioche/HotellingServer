@@ -66,6 +66,8 @@ class ParametersFrame(QWidget, Logger):
 
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
+
+        self.run_button.setDefault(True)
     
     def set_next_frame_previous_frame_methods(self, server_name):
 

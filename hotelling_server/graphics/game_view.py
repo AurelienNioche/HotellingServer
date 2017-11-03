@@ -230,9 +230,7 @@ class GameFrame(QWidget, Logger):
 
             ids[role] = [(name, game_id) for game_id, name, r, bot in self.assignment if role == r]
 
-            if not self.table_layout[role].isHidden():
-
-                self.table_layout[role].update(ids[role], parameters)
+            self.table_layout[role].update(ids[role], parameters)
 
     def _initialize_figures(self):
 

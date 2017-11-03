@@ -91,7 +91,6 @@ class Data(Logger):
 
     def write_param(self, key, new_value):
         
-        self.log(new_value)
         self.controller.backup.write_param(key, new_value)
 
     def save(self):

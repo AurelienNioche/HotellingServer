@@ -89,15 +89,17 @@ class Controller(Thread, Logger):
 
     def stop_game_second_phase(self):
 
+        self.continue_game.clear()
         self.running_game.clear()
+        self.server.running_game.clear()
 
     def close_program(self):
 
         self.log("Close program.")
         self.running_game.set()
 
-        # server if it was not launched
         if self.server_queue is not None:
+            self.erase_tables()
             self.server_queue.put(("Abort",))
             self.stop_server()
             self.server.end()
@@ -120,20 +122,20 @@ class Controller(Thread, Logger):
             self.graphic_queue.put((instruction, arg))
         else:
             self.graphic_queue.put((instruction, ))
+
         self.communicate.signal.emit()
 
     def stop_server(self):
 
         self.log("Stop server.")
         self.server.stop_to_serve()
-        self.server.running_game.clear()
 
     def start_server(self):
 
         if not self.running_server.is_set():
             self.server.start()
+            self.server_queue.put(("serve", ))
 
-        self.server_queue.put(("serve", ))
         self.running_server.set()
         self.log("Server running.")
 
@@ -153,6 +155,16 @@ class Controller(Thread, Logger):
 
         self.device_scanning_event.clear()
         self.ask_interface("stop_scanning_network")
+
+    def erase_tables(self):
+        """ 
+        this method does not use 
+        server queue because it needs to be run at 
+        shutdown. Otherwise server does not have the time 
+        to treat_requests and tables are not erased.
+        """
+        tables = "participants", "waiting_list", "request", "response"
+        self.server.ask_for_erasing_tables(tables=tables)
 
     # ------------------------------- Message handling ----------------------------------------------- #
 
@@ -185,6 +197,11 @@ class Controller(Thread, Logger):
             response = self.init.ask_init(server_data)
             self.server_queue.put((response[0], response[1]))
 
+        # init admin
+        elif "ask_admin_init" in server_data:
+            response = self.init.ask_admin_init()
+            self.server_queue.put((response[0], response[1]))
+
         else:
             response = self.game.handle_request(server_data)
             self.server_queue.put((response[0], response[1]))
@@ -202,16 +219,38 @@ class Controller(Thread, Logger):
 
         self.log("Got new message from distant server coming from {}: '{}'.".format(user_name, message))
         self.ask_interface("controller_new_message", (user_name, message))
+
+    def server_update_assignment_frame(self, waiting_list):
+
+        n_player = self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]
+
+        if len(waiting_list) <= n_player:
+            participants = waiting_list
+        else:
+            participants = waiting_list[:n_player]
+
+        self.ask_interface("update_waiting_list_assignment_frame", participants)
    
     # ------------------------------ UI interface  -------------------------------------------#
 
     def ui_set_server(self, server_class):
-        self.log("Server's class: {}".format(server_class), level=1)
-        self.server = server_class(controller=self)
-        self.server_queue = self.server.main_queue
-        self.init.set_server_class(server_class)
-        self.ask_interface("set_server_class_parametrization_frame", server_class)
-        self.ask_interface("enable_server_related_menubar")
+        """
+        instantiate server if it doesn't exists. 
+        if it exists check if its a different type of server
+        if it is the case instantiate new server
+        else do nothing
+        """
+        
+        server = getattr(self, "server")
+        
+        if server is None or server.name != server_class.name: 
+
+            self.log("Server's class: {}".format(server_class), level=1)
+            self.server = server_class(controller=self)
+            self.server_queue = self.server.main_queue
+            self.init.set_server_class(server_class)
+            self.ask_interface("set_server_class_parametrization_frame", server_class)
+            self.ask_interface("enable_server_related_menubar")
 
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param), level=1)
@@ -256,6 +295,10 @@ class Controller(Thread, Logger):
         self.log("UI ask 'stop game'.")
         self.stop_game_first_phase()
 
+    def ui_force_to_stop_game(self):
+        self.log("UI asks 'force to stop game'.")
+        self.stop_game_second_phase()
+
     def ui_close_window(self):
         self.log("UI ask 'close window'.")
         self.close_program()
@@ -270,6 +313,11 @@ class Controller(Thread, Logger):
         self.log("Write interface parameters to json files.")
 
     def ui_update_game_view_data(self):
+        """
+        update figures and tables 
+        on game view.
+        does it only when game is running
+        """
 
         if self.running_game.is_set():
             self.log("UI asks 'update data'.", level=1)
@@ -307,47 +355,43 @@ class Controller(Thread, Logger):
 
     def ui_php_run_game(self):
 
-        roles = [i[2] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
-        participants = [i[1] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
-        game_ids = [i[0] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
+        # ---------- get roles, participants, and game_ids in assignment ------- # 
+        roles = [i[2] for i in self.data.assignment if i[3] is False]
+        participants = [i[1] for i in self.data.assignment if i[3] is False]
+        game_ids = [i[0] for i in self.data.assignment if i[3] is False]
+        # --------------------------------------------------- # 
 
-        # write participants mapping to json file
+        # ----- write participants mapping to json file ---- # 
         mapping = {str(game_id): name for game_id, name, role, bot in self.data.assignment}
         
         self.data.param["map_php"] = mapping
         self.data.write_param("map_php", mapping)
         self.data.write_param("assignment_php", self.data.assignment)
+        # --------------------------------------------------- # 
 
-        self.server.authorize_participants(participants=participants, roles=roles, game_ids=game_ids)
+        # --------- Authorize participants to run game ------ # 
+        self.server.side_queue.put(("authorize_participants", participants, roles, game_ids))
+        # --------------------------------------------------- # 
 
         self.ask_interface("show_frame_parametrization")
 
+        # ------- Run game -----------------------------------# 
         self.log("UI ask 'run game'.")
         self.data.new()
         self.time_manager.setup()
         self.launch_game()
         self.game.new()
+        # --------------------------------------------------- # 
 
     def ui_php_scan_button(self):
 
-        n_player = self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]
-        waiting_list = self.server.get_waiting_list()  # Potential conflict with the call in 'push_next_button'
-
-        if len(waiting_list) <= n_player:
-            participants = waiting_list
-        else:
-            participants = waiting_list[:n_player]
-
-        self.ask_interface("update_waiting_list_assignment_frame", participants)
+        self.server.side_queue.put(("get_waiting_list", ))
 
     def ui_php_erase_sql_tables(self, tables):
         
-        if self.server is not None and self.server.server_address is not None:
+        if self.running_server.is_set():
+            self.server.side_queue.put(("erase_sql_tables", tables))
 
-            if self.running_server.is_set():
-                self.server.side_queue.put(("erase_sql_tables", tables))
-            else:
-                self.server.ask_for_erasing_tables(tables)
         else:
             self.ask_interface("show_warning", "Server is not configured!")
 
@@ -355,7 +399,7 @@ class Controller(Thread, Logger):
 
         if self.server is not None and self.server.server_address is not None:
 
-            self.server.set_missing_players(value)
+            self.server.side_queue.put(("set_missing_players", value))
 
     # ------------------------------ Time Manager interface ------------------------------------ #
 

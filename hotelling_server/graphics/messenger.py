@@ -222,7 +222,7 @@ class Entry(QtWidgets.QLabel):
         self.pending_messages = 0
         self.setText(self.user_name)
 
-        self.change_background_color("gray")
+        self.change_background_color("blue")
 
     def deselect(self):
 
@@ -242,11 +242,15 @@ class Entry(QtWidgets.QLabel):
     def change_background_color(self, color):
 
         colors = {
-            "gray": QtCore.Qt.lightGray, "transparent": QtCore.Qt.transparent}
+            "gray": QtCore.Qt.lightGray, "transparent": QtCore.Qt.transparent,
+            "blue": "#5294E2" } 
 
-        p = self.palette()
-        p.setColor(self.backgroundRole(), colors[color])
-        self.setPalette(p)
+        self.setStyleSheet("background-color: {};".format(colors[color]))
+        
+        # if not hex color
+        # p = self.palette()
+        # p.setColor(self.backgroundRole(), colors[color])
+        # self.setPalette(p)
 
 
 class ConversationPicker(QtWidgets.QTableWidget):

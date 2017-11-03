@@ -477,3 +477,93 @@ class Game(Logger):
         else:
             choices = self.get_client_choices(firm_id, t)
             return self.reply(game_id, function_name(), t, choices, self.check_end(t))
+
+    # ---------------------------------------- Admin demands ------------------------------------------- # 
+
+    def ask_admin_firm_choice(self, t):
+        """called by admin"""
+
+        game_id = -1
+
+        self.log("admin asks for active firm strategies.")
+        self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
+
+        if t == self.time_manager.t:
+
+            if self.time_manager.state == "active_has_played" or \
+                    self.time_manager.state == "active_has_played_and_all_customers_replied":
+
+                firm_active_id = self.data.current_state["firm_status"].index("active")
+
+                out = self.reply(
+                    game_id,
+                    function_name(),
+                    self.time_manager.t,
+                    # firm_active_id,
+                    self.data.current_state["firm_positions"][firm_active_id],
+                    self.data.current_state["firm_prices"][firm_active_id],
+                )
+
+                return out
+
+            else:
+                return self.reply_error("wait")
+
+        elif t > self.time_manager.t:
+            return self.reply_error("time_is_superior")
+
+        else:
+
+            firm_active_id = self.data.history["firm_status"][t].index("active")
+
+            return self.reply(
+                game_id,
+                function_name(),
+                t,
+                # firm_active_id,
+                self.data.history["firm_positions"][t][firm_active_id],
+                self.data.history["firm_prices"][t][firm_active_id],
+            )
+
+    def ask_admin_customer_choices(self, t):
+
+        game_id = -1
+
+        self.log("admin asks for client choices.")
+        self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
+
+        if t == self.time_manager.t:
+
+            if self.time_manager.state == "active_has_played_and_all_customers_replied":
+
+                firm_active_id = self.data.current_state["firm_status"].index("active")
+
+                out = self.reply(
+                    game_id,
+                    function_name(),
+                    self.time_manager.t,
+                    self.get_client_choices(1, t),
+                    self.check_end(t)
+                )
+
+                return out
+
+            else:
+                return self.reply_error("wait")
+
+        elif t > self.time_manager.t:
+            return self.reply_error("time_is_superior")
+
+        else:
+
+            firm_active_id = self.data.history["firm_status"][t].index("active")
+
+            return self.reply(
+                game_id,
+                function_name(),
+                t,
+                self.get_client_choices(firm_active_id, t),
+                self.check_end(t)
+            )
+
+
