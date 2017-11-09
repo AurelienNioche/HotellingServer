@@ -71,9 +71,9 @@ class Init:
         self.data.roles[game_id] = role
 
         if role == "firm":
-            return self.init_firms_php("ask_init", game_id, role)
+            return self.init_firms_php("ask_init", game_id)
         else:
-            return self.init_customers_php("ask_init", game_id, role)
+            return self.init_customers_php("ask_init", game_id)
 
     def init_customers_tcp(self, func_name, game_id, role):
 
@@ -92,7 +92,7 @@ class Init:
             game_id, func_name, self.time_manager.t, role, position, exploration_cost,
             utility_consumption, utility)
 
-    def init_customers_php(self, func_name, game_id, role):
+    def init_customers_php(self, func_name, game_id):
 
         if game_id not in self.data.customers_id.keys():
             customer_id = len(self.data.customers_id)
@@ -118,24 +118,7 @@ class Init:
 
         return position, exploration_cost, utility_consumption, utility
 
-    def init_firms_tcp(self, func_name, game_id, role):
-
-        if game_id not in self.data.firms_id.keys():
-            firm_id = len(self.data.firms_id)
-            self.data.firms_id[game_id] = firm_id
-
-        # if device already asked for init, get id
-        else:
-            firm_id = self.data.firms_id[game_id]
-
-        state, position, price, opp_position, opp_price, profits = self.get_firms_data(firm_id)
-
-        self.check_remaining_agents()
-
-        return self.reply(game_id, func_name, self.time_manager.t,
-            position, state, price, opp_position, opp_price, profits)
-
-    def init_firms_php(self, func_name, game_id, role):
+    def init_firms_tcp(self, func_name, game_id):
 
         if game_id not in self.data.firms_id.keys():
             firm_id = len(self.data.firms_id)
@@ -149,16 +132,35 @@ class Init:
 
         self.check_remaining_agents()
 
-        return self.reply(game_id,
-                func_name,
-                self.time_manager.t,
-                position,
-                state,
-                price,
-                opp_position,
-                opp_price,
-                profits,
-                opp_profits)
+        return self.reply(
+            game_id, func_name, self.time_manager.t,
+            position, state, price, opp_position, opp_price, profits)
+
+    def init_firms_php(self, func_name, game_id):
+
+        if game_id not in self.data.firms_id.keys():
+            firm_id = len(self.data.firms_id)
+            self.data.firms_id[game_id] = firm_id
+
+        # if device already asked for init, get id
+        else:
+            firm_id = self.data.firms_id[game_id]
+
+        state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
+
+        self.check_remaining_agents()
+
+        return self.reply(
+            game_id,
+            func_name,
+            self.time_manager.t,
+            position,
+            state,
+            price,
+            opp_position,
+            opp_price,
+            profits,
+            opp_profits)
 
     def get_firms_data(self, firm_id):
 

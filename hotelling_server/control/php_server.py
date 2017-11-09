@@ -1,7 +1,6 @@
 from multiprocessing import Queue, Event
 from threading import Thread, Event
 import requests as rq
-import time
 import json
 
 from utils.utils import Logger
