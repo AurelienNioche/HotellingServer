@@ -182,11 +182,17 @@ class Init:
 
         state = cs["firm_status"][firm_id]
 
-        if state == "passive" and cs["active_gets_results"] is True:
+        if (state == "passive" and cs["active_gets_results"] is True) or \
+                (state == "active" and cs["passive_gets_results"] is True):
             firm_choices = np.asarray(cs["customer_firm_choices"])
-            cond = firm_choices == opponent_id
-            n_opp = sum(cond)
+            n_opp = sum(firm_choices == opponent_id)
             opp_profits -= n_opp * opp_price
+
+        if (state == "active" and cs["active_gets_results"] is True) or \
+                (state == "passive" and cs["passive_gets_results"] is True):
+            firm_choices = np.asarray(cs["customer_firm_choices"])
+            n = sum(firm_choices == firm_id)
+            profits -= n * price
 
         return (t,
                 state,
