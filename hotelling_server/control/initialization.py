@@ -2,6 +2,9 @@ from multiprocessing import Queue
 import numpy as np
 
 
+from copy import deepcopy
+
+
 class Init:
 
     name = "Init"
@@ -146,14 +149,14 @@ class Init:
         else:
             firm_id = self.data.firms_id[game_id]
 
-        state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
+        t, state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
         return self.reply(
             game_id,
             func_name,
-            self.time_manager.t,
+            t,
             position,
             state,
             price,
@@ -166,17 +169,27 @@ class Init:
 
         opponent_id = (firm_id + 1) % 2
 
-        state = self.data.current_state["firm_status"][firm_id]
+        t = self.time_manager.t
+        cs = deepcopy(self.data.current_state)
 
-        position = self.data.current_state["firm_positions"][firm_id]
-        price = self.data.current_state["firm_prices"][firm_id]
-        profits = self.data.current_state["firm_cumulative_profits"][firm_id]
+        position = cs["firm_positions"][firm_id]
+        price = cs["firm_prices"][firm_id]
+        profits = cs["firm_cumulative_profits"][firm_id]
 
-        opp_position = self.data.current_state["firm_positions"][opponent_id]
-        opp_price = self.data.current_state["firm_prices"][opponent_id]
-        opp_profits = self.data.current_state["firm_cumulative_profits"][opponent_id]
+        opp_position = cs["firm_positions"][opponent_id]
+        opp_price = cs["firm_prices"][opponent_id]
+        opp_profits = cs["firm_cumulative_profits"][opponent_id]
 
-        return (state,
+        state = cs["firm_status"][firm_id]
+
+        if state == "passive" and cs["active_gets_results"] is True:
+            firm_choices = np.asarray(cs["customer_firm_choices"])
+            cond = firm_choices == opponent_id
+            n_opp = sum(cond)
+            opp_profits -= n_opp * opp_price
+
+        return (t,
+                state,
                 position,
                 price,
                 opp_position,
