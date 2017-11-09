@@ -131,12 +131,12 @@ class Init:
         else:
             firm_id = self.data.firms_id[game_id]
 
-        state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
+        t, state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
         return self.reply(
-            game_id, func_name, self.time_manager.t,
+            game_id, func_name, t,
             position, state, price, opp_position, opp_price, profits)
 
     def init_firms_php(self, func_name, game_id):

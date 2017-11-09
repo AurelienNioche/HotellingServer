@@ -1,8 +1,0 @@
-{ "table_names": [
-  "waiting_list",
-  "response",
-  "request",
-  "participants",
-  "chatServer",
-  "chatClient"
-] }
