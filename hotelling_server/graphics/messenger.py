@@ -1,5 +1,5 @@
-from PyQt5 import QtCore, QtWidgets
 import sys
+from PyQt5 import QtCore, QtWidgets
 
 from utils.utils import Logger
 
@@ -243,10 +243,10 @@ class Entry(QtWidgets.QLabel):
 
         colors = {
             "gray": QtCore.Qt.lightGray, "transparent": QtCore.Qt.transparent,
-            "blue": "#5294E2" } 
+            "blue": "#5294E2"}
 
         self.setStyleSheet("background-color: {};".format(colors[color]))
-        
+
         # if not hex color
         # p = self.palette()
         # p.setColor(self.backgroundRole(), colors[color])
@@ -328,12 +328,14 @@ class MessengerFrame(QtWidgets.QWidget, Logger):
     Main frame of the messenger.
     """
 
+    name = "MessengerFrame"
+
     def __init__(self, parent):
 
         # noinspection PyArgumentList
         super().__init__()
 
-        self.parent = parent 
+        self.parent = parent
         self.setWindowTitle("Messenger")
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -392,6 +394,7 @@ class MessengerFrame(QtWidgets.QWidget, Logger):
         user_name = user_name.lower().capitalize()
 
         new_user = user_name not in self.conversations.dic.keys()
+
         if new_user:
             self.conversations.create_new_conversation(user_name)
             self.conversation_picker.create_new_entry(user_name, select=self.conversations.selected is None)

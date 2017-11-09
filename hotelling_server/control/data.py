@@ -45,6 +45,8 @@ class Data(Logger):
 
         self.assignment = {}
 
+        self.condition = None
+
         self.parametrization = {}
         self.roles = []
 
@@ -112,7 +114,8 @@ class Data(Logger):
                 "continue": self.controller.time_manager.continue_game,
                 "time_manager_state": self.controller.time_manager.state,
                 "assignment": self.assignment,
-                "parametrization": self.parametrization
+                "parametrization": self.parametrization,
+                "condition": self.condition
             }
         )
 
@@ -139,6 +142,7 @@ class Data(Logger):
         self.continue_game = data["continue"]
         self.assignment = data["assignment"]
         self.parametrization = data["parametrization"]
+        self.condition = data["condition"]
 
     def update_history(self):
 

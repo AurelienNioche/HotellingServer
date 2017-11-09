@@ -33,7 +33,7 @@ class ParametersFrame(QWidget, Logger):
                       "exploration_cost",
                       "utility_consumption",
                       "condition"]
-        
+                      
         # These two depends on server class choice
         self.show_frame_assignment = None
         self.show_frame_game = None
@@ -56,8 +56,7 @@ class ParametersFrame(QWidget, Logger):
                          initial_value=param["utility_consumption"], value_range=[0, 100])
 
         self.widgets["condition"] = \
-             IntParameter(text="Transportation Cost (high=1, low=0)", initial_value=0,
-                value_range=[0, 1])
+             RadioParameter(text="Transportation Cost")
 
         self.fill_layout()
 
@@ -214,3 +213,45 @@ class CheckParameter(object):
 
         layout.addWidget(self.label, x, y, alignment=Qt.AlignCenter)
         layout.addWidget(self.check_box, x, y + 1, alignment=Qt.AlignLeft)
+
+
+class RadioParameter:
+
+    def __init__(self, text):
+
+        self.text = QLabel(text)
+        
+        self.layout = QHBoxLayout()
+
+        self.group = QButtonGroup()
+        self.high = QRadioButton()
+        self.low = QRadioButton()
+
+        self.low.setChecked(True)
+
+        self.label = {0: QLabel("low"), 1: QLabel("high")}
+
+        self.setup()
+
+    def setup(self):
+
+        self.layout.addWidget(self.label[0])
+        self.layout.addWidget(self.low)
+
+        self.layout.addWidget(self.label[1])
+        self.layout.addWidget(self.high)
+
+        self.group.addButton(self.high)
+        self.group.addButton(self.low)
+
+    def get_value(self):
+
+        return ("low_t_cost", "high_t_cost")[self.high.isChecked()]
+
+    def add_to_grid_layout(self, layout, x, y):
+
+        layout.addWidget(self.text, x, y, alignment=Qt.AlignLeft)
+        layout.addLayout(self.layout, x, y + 1, alignment=Qt.AlignCenter)
+
+
+

@@ -119,8 +119,8 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
         
-        self.layout.addWidget(self.erase_tables_button, alignment=Qt.AlignCenter)
         self.layout.addWidget(self.missing_players_button, alignment=Qt.AlignCenter)
+        self.layout.addWidget(self.erase_tables_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
 

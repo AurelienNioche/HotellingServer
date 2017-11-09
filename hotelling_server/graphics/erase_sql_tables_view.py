@@ -5,6 +5,8 @@ from PyQt5.QtCore import Qt
 
 class EraseSQLTablesFrame(QWidget):
 
+    name = "EraseSQLTablesFrame"
+
     def __init__(self, parent, param):
 
         super().__init__()

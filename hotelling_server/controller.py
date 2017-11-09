@@ -64,7 +64,7 @@ class Controller(Thread, Logger):
 
         while not self.shutdown.is_set():
 
-            self.log("Waiting for a message.", level=1)
+            self.log("Waiting for a message.")
             message = self.queue.get()
             self.handle_message(message)
 
@@ -79,7 +79,7 @@ class Controller(Thread, Logger):
         self.running_game.set()
         self.server.running_game.set()
         self.ask_interface("show_frame_game")
-        self.log("Game launched.")
+        self.log("Game launched.", level=1)
 
     def stop_game_first_phase(self):
 
@@ -95,7 +95,7 @@ class Controller(Thread, Logger):
 
     def close_program(self):
 
-        self.log("Close program.")
+        self.log("Close program.", level=1)
         self.running_game.set()
 
         if self.server_queue is not None:
@@ -127,7 +127,7 @@ class Controller(Thread, Logger):
 
     def stop_server(self):
 
-        self.log("Stop server.")
+        self.log("Stop server.", level=1)
         self.server.stop_to_serve()
 
     def start_server(self):
@@ -137,7 +137,7 @@ class Controller(Thread, Logger):
             self.server_queue.put(("serve", ))
 
         self.running_server.set()
-        self.log("Server running.")
+        self.log("Server running.", level=1)
 
     def scan_network_for_new_devices(self):
 
@@ -183,7 +183,7 @@ class Controller(Thread, Logger):
 
     def server_error(self, error_message):
 
-        self.log("Server error.")
+        self.log("Server error.", level=3)
         self.ask_interface("server_error", error_message)
 
     def server_request(self, server_data):
@@ -245,7 +245,7 @@ class Controller(Thread, Logger):
         
         if server is None or server.name != server_class.name: 
 
-            self.log("Server's class: {}".format(server_class), level=1)
+            self.log("Server's class: {}".format(server_class))
             self.server = server_class(controller=self)
             self.server_queue = self.server.main_queue
             self.init.set_server_class(server_class)
@@ -253,7 +253,7 @@ class Controller(Thread, Logger):
             self.ask_interface("enable_server_related_menubar")
 
     def ui_set_server_parameters(self, param):
-        self.log("Setting server parameters from interface: {}".format(param), level=1)
+        self.log("Setting server parameters from interface: {}".format(param))
         self.server.setup(param)
 
         # start server
@@ -262,14 +262,15 @@ class Controller(Thread, Logger):
         self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
-        self.log("Setting game assignement from interface: {}".format(assignment), level=1)
+        self.log("Setting game assignement from interface: {}".format(assignment))
         self.data.assignment = assignment
         self.init.set_assignment(assignment)
         self.ask_interface("set_assignment_game_frame", assignment)
 
     def ui_set_parametrization(self, param):
-        self.log("Setting parametrization from interface : {}".format(param), level=0)
+        self.log("Setting parametrization from interface : {}".format(param), level=1)
         self.data.parametrization = param
+        self.data.condition = param["condition"]
 
     def ui_tcp_run_game(self):
         self.log("UI ask 'run game'.")
@@ -320,7 +321,7 @@ class Controller(Thread, Logger):
         """
 
         if self.running_game.is_set():
-            self.log("UI asks 'update data'.", level=1)
+            self.log("UI asks 'update data'.")
             self.ask_interface("update_tables", self.get_current_data())
             self.ask_interface("update_figures", self.get_current_data())
 

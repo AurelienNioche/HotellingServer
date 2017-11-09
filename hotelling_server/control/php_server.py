@@ -28,19 +28,51 @@ class BasePHPServer(Thread, Logger):
         self.server_address_messenger = None
         self.param = None
 
+        self.setup_done = False
+
     def setup(self, param):
 
         self.param = param
         self.server_address = self.param["network"]["php_server"]
         self.server_address_messenger = self.param["network"]["messenger"]
 
+        if not self.setup_done:
+            self.is_another_server_running()
+
+        self.setup_done = True
+
+    def is_another_server_running(self):
+
+        while True:
+
+            response = self.send_request(
+                demand_type="writing",
+                table="server_is_running",
+                close_server=0
+            )
+
+            self.log("I got the response '{}' from the distant server.".format(response.text))
+
+            if response.text == "I updated is_running variable from server_is_running.":
+                break
+            
+            elif response.text == "Another server seems to be running.":
+
+                self.log("Another server seems to be running! Game could be compromised!", level=3)
+                self.cont.queue.put((
+                    "ask_interface", 
+                    "show_critical_and_ok", 
+                    "Another server seems to be running! Game could be compromised!"))
+
+                break
+
     def run(self):
 
         while not self.shutdown_event.is_set():
 
-            self.log("Waiting for a message...", level=1)
+            self.log("Waiting for a message...")
             msg = self.main_queue.get()
-            self.log("I received msg '{}'.".format(msg), level=1)
+            self.log("I received msg '{}'.".format(msg))
 
             if msg and msg[0] == "serve":
                 
@@ -92,13 +124,14 @@ class BasePHPServer(Thread, Logger):
 
                 self.send_message(msg[1], msg[2])
 
-            elif msg and msg[0] == "erase_sql_tables":
-                self.ask_for_erasing_tables(tables=msg[1:])
-
             elif msg and msg[0] == "get_waiting_list":
 
                 waiting_list = self.get_waiting_list()
                 self.cont.queue.put(("server_update_assignment_frame", waiting_list))
+
+            elif msg and msg[0] == "erase_sql_tables":
+
+                self.ask_for_erasing_tables(tables=msg[1:])
 
             elif msg and msg[0] == "authorize_participants":
 
@@ -136,7 +169,7 @@ class BasePHPServer(Thread, Logger):
 
     def receive_messages(self):
 
-        self.log("I send a request for collecting the messages.", level=1)
+        self.log("I send a request for collecting the messages.")
 
         response = self.send_request_messenger(
             demandType="serverHears",
@@ -145,20 +178,23 @@ class BasePHPServer(Thread, Logger):
         )
 
         if "reply" in response.text:
+
             args = [i for i in response.text.split("/") if i]
             n_messages = int(args[1])
 
-            self.log("I received {} new message(s).".format(n_messages), level=1)
+            self.log("I received {} new message(s).".format(n_messages))
 
             if n_messages:
-                for arg in args[2:]:
-                    sep_args = arg.split("<>")
 
+                for arg in args[2:]:
+
+                    sep_args = arg.split("<>")
                     user_name, message = sep_args[0], sep_args[1]
 
                     self.cont.queue.put(("server_new_message", user_name, message))
 
                     self.log("I send confirmation for message '{}'.".format(arg))
+
                     self.send_request_messenger(
                         demandType="serverReceiptConfirmation",
                         userName=user_name,
@@ -175,7 +211,25 @@ class BasePHPServer(Thread, Logger):
             message=message
         )
 
-        self.log("I receive: {}".format(response))
+        self.log("I receive: {}".format(response.text))
+
+    def set_server_is_not_running_anymore(self):
+
+        while True:
+
+            self.log("I notify sql tables that server is closed.", level=1)
+
+            response = self.send_request(
+                demand_type="writing",
+                table="server_is_running",
+                close_server=1,
+            )
+
+            self.log("I receive: {}".format(response.text))
+
+            if response.text == "Updated is_running to 0.":
+                self.log("Server is not running anymore on SQL tables.", level=1) 
+                break 
 
     def stop_to_serve(self):
         self.serve_event.clear()
@@ -183,7 +237,7 @@ class BasePHPServer(Thread, Logger):
     def end(self):
         self.shutdown_event.set()
         self.serve_event.clear()
-
+        self.set_server_is_not_running_anymore()
         self.main_queue.put("break")
 
 
@@ -196,7 +250,7 @@ class RequestManager:
                 return rq.get(self.server_address, params=kwargs)
 
             except Exception:
-                self.log("I got a connection error. Try again.", level=0)
+                self.log("I got a connection error. Try again.", level=3)
                 Event().wait(self.request_frequency)
     
     def send_request_messenger(self, **kwargs):
@@ -206,7 +260,7 @@ class RequestManager:
                 return rq.post(self.server_address_messenger, data=kwargs)
 
             except Exception:
-                self.log("I got a connection error. Try again.", level=0)
+                self.log("I got a connection error. Try again.", level=3)
                 Event().wait(self.request_frequency)
 
 
@@ -222,7 +276,7 @@ class PHPServer(BasePHPServer, RequestManager):
 
         while True:
 
-            self.log("I will ask the distant server to the 'waiting_list' table.", level=1)
+            self.log("I will ask the distant server to the 'waiting_list' table.")
 
             response = self.send_request(
                 demand_type="reading",
@@ -294,7 +348,8 @@ class PHPServer(BasePHPServer, RequestManager):
 
         while True:
 
-            self.log("I will ask the distant server to fill the 'participants' table with {}".format(participants))
+            self.log("I will ask the distant server to fill the 'participants' table with {}".format(participants),
+                    level=1)
 
             response = self.send_request(
                 demand_type="writing",
@@ -304,7 +359,7 @@ class PHPServer(BasePHPServer, RequestManager):
                 roles=json.dumps(roles)
             )
 
-            self.log("I got the response '{}' from the distant server.".format(response.text))
+            self.log("I got the response '{}' from the distant server.".format(response.text), level=1)
 
             if response.text == "I inserted participants in 'participants' table.":
                 break
@@ -313,14 +368,14 @@ class PHPServer(BasePHPServer, RequestManager):
 
         while True:
 
-            self.log("I will ask the distant server to erase tables.")
+            self.log("I will ask the distant server to erase tables.", level=1)
 
             response = self.send_request(
                 demand_type="empty_tables",
                 table_names=json.dumps(tables)
             )
 
-            self.log("I got the response '{}' from the distant server.".format(response.text))
+            self.log("I got the response '{}' from the distant server.".format(response.text), level=1)
 
             if "Tables" in response.text and "have been erased" in response.text:
                 break
@@ -329,7 +384,8 @@ class PHPServer(BasePHPServer, RequestManager):
 
         while True:
 
-            self.log("I will ask the distant server to update the 'missing_players' variable with {}".format(value))
+            self.log("I will ask the distant server to update the 'missing_players' variable with {}".format(value),
+                    level=1)
 
             response = self.send_request(
                 demand_type="writing",
@@ -337,7 +393,7 @@ class PHPServer(BasePHPServer, RequestManager):
                 missingPlayers=value
             )
 
-            self.log("I got the response '{}' from the distant server.".format(response.text))
+            self.log("I got the response '{}' from the distant server.".format(response.text), level=1)
 
             if response.text == "I updated missing players in 'game' table.":
                 break

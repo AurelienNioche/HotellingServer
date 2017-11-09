@@ -133,7 +133,7 @@ class UI(QWidget, Logger, MessageBox):
             self.restoreGeometry(self.settings.value("geometry"))
 
         except Exception as e:
-            self.log(str(e)) 
+            self.log(str(e), level=3) 
 
     def prepare_frames(self): 
 
@@ -223,7 +223,7 @@ class UI(QWidget, Logger, MessageBox):
                 self.check_for_saving_parameters()
 
             self.save_geometry()
-            self.log("Close window")
+            self.log("Close window", level=1)
             self.close_menubar_windows()
 
             # stop timers
@@ -236,7 +236,7 @@ class UI(QWidget, Logger, MessageBox):
             event.accept()
 
         else:
-            self.log("Ignore close window.")
+            self.log("Ignore close window.", level=1)
             event.ignore()
 
     def close_menubar_windows(self):
@@ -270,7 +270,7 @@ class UI(QWidget, Logger, MessageBox):
                     self.write_parameters(key, self.param[key])
 
             else:
-                self.log('Saving of parameters aborted.')
+                self.log('Saving of parameters aborted.', level=1)
     
     # ------------------------- Called every second methods ------------------------------------- # 
 
@@ -289,7 +289,7 @@ class UI(QWidget, Logger, MessageBox):
             self.occupied.set()
 
             msg = self.queue.get()
-            self.log("I received message '{}'.".format(msg), level=1)
+            self.log("I received message '{}'.".format(msg))
 
             command = getattr(self, msg[0])
             args = msg[1:]
