@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QMessageBox
 
+
 class MessageBox:
 
     def show_question(self, msg, question="", yes="Yes", no="No", focus="No"):

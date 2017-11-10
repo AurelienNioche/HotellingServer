@@ -3,7 +3,7 @@ from threading import Thread
 
 from utils.utils import Logger
 from hotelling_server.control import backup, data, game, statistician, \
-        id_manager, time_manager, initialization
+        id_manager, time_manager, initialization, php_server
 
 
 class Controller(Thread, Logger):
@@ -35,14 +35,13 @@ class Controller(Thread, Logger):
         self.game = game.Game(controller=self)
         self.init = initialization.Init(controller=self)
 
-        self.server = None
+        self.server = php_server.PHPServer(controller=self)
+        # To give signals to server
+        self.server_queue = self.server.main_queue
 
         # For giving instructions to graphic process
         self.graphic_queue = self.mod.ui.queue
         self.communicate = self.mod.ui.communicate
-
-        # For giving go signal to server
-        self.server_queue = None
 
     def run(self):
 
@@ -60,7 +59,7 @@ class Controller(Thread, Logger):
         self.ask_interface("show_frame_setting_up")
 
         # Start
-        self.ask_interface("show_frame_start")
+        self.ask_interface("show_frame_load_game_new_game_php")
 
         while not self.shutdown.is_set():
 
@@ -96,13 +95,11 @@ class Controller(Thread, Logger):
     def close_program(self):
 
         self.log("Close program.", level=1)
-        self.running_game.set()
+        #self.running_game.set()
 
-        if self.server_queue is not None:
-            self.erase_tables()
-            self.server_queue.put(("Abort",))
-            self.stop_server()
-            self.server.end()
+        self.server_queue.put(("Abort",))
+        self.stop_server()
+        self.server.end()
 
         self.shutdown.set()
 
@@ -139,28 +136,11 @@ class Controller(Thread, Logger):
         self.running_server.set()
         self.log("Server running.", level=1)
 
-    def scan_network_for_new_devices(self):
-
-        self.start_server()
-        self.device_scanning_event.set()
-
-    def add_device_to_map_android_id_server_id(self, server_data):
-
-        android_id = server_data.split("/")[-1]
-        self.id_manager.get_ids_from_android_id(android_id, max_n=1)
-
-        response = "error/adding_new_device"
-        self.server_queue.put(("reply", response))
-        self.stop_server()
-
-        self.device_scanning_event.clear()
-        self.ask_interface("stop_scanning_network")
-
     def erase_tables(self):
-        """ 
-        this method does not use 
-        server queue because it needs to be run at 
-        shutdown. Otherwise server does not have the time 
+        """
+        this method does not use
+        server queue because it needs to be run at
+        shutdown. Otherwise server does not have the time
         to treat_requests and tables are not erased.
         """
         tables = "participants", "waiting_list", "request", "response"
@@ -187,11 +167,11 @@ class Controller(Thread, Logger):
         self.ask_interface("server_error", error_message)
 
     def server_request(self, server_data):
-        
+
         # when using device manager to add new clients to json mapping
         if self.device_scanning_event.is_set():
             self.add_device_to_map_android_id_server_id(server_data)
-        
+
         # When game is launched
         elif "ask_init" in server_data:
             response = self.init.ask_init(server_data)
@@ -230,27 +210,8 @@ class Controller(Thread, Logger):
             participants = waiting_list[:n_player]
 
         self.ask_interface("update_waiting_list_assignment_frame", participants)
-   
+
     # ------------------------------ UI interface  -------------------------------------------#
-
-    def ui_set_server(self, server_class):
-        """
-        instantiate server if it doesn't exists. 
-        if it exists check if its a different type of server
-        if it is the case instantiate new server
-        else do nothing
-        """
-        
-        server = getattr(self, "server")
-        
-        if server is None or server.name != server_class.name: 
-
-            self.log("Server's class: {}".format(server_class))
-            self.server = server_class(controller=self)
-            self.server_queue = self.server.main_queue
-            self.init.set_server_class(server_class)
-            self.ask_interface("set_server_class_parametrization_frame", server_class)
-            self.ask_interface("enable_server_related_menubar")
 
     def ui_set_server_parameters(self, param):
         self.log("Setting server parameters from interface: {}".format(param))
@@ -282,7 +243,7 @@ class Controller(Thread, Logger):
     def ui_load_game(self, file):
         self.log("UI ask 'load game'.")
         self.data.load(file)
-        
+
         # set assignment for interface (display game_view) and init
         assignment = self.data.assignment
         self.init.set_assignment(assignment)
@@ -315,7 +276,7 @@ class Controller(Thread, Logger):
 
     def ui_update_game_view_data(self):
         """
-        update figures and tables 
+        update figures and tables
         on game view.
         does it only when game is running
         """
@@ -336,13 +297,13 @@ class Controller(Thread, Logger):
     def ui_look_for_alive_players(self):
 
         self.log("UI asks 'look for alive players'.")
-        
-        if self.game.is_ended():
-            
-            # display start frame
-            self.ask_interface("show_frame_start")
 
-            # stop bots 
+        if self.game.is_ended():
+
+            # display start frame
+            self.ask_interface("show_frame_load_game_new_game_php")
+
+            # stop bots
             self.game.stop_bots()
 
         else:
@@ -356,40 +317,40 @@ class Controller(Thread, Logger):
 
     def ui_php_run_game(self):
 
-        # ---------- get roles, participants, and game_ids in assignment ------- # 
+        # ---------- get roles, participants, and game_ids in assignment ------- #
         roles = [i[2] for i in self.data.assignment if i[3] is False]
         participants = [i[1] for i in self.data.assignment if i[3] is False]
         game_ids = [i[0] for i in self.data.assignment if i[3] is False]
-        # --------------------------------------------------- # 
+        # --------------------------------------------------- #
 
-        # ----- write participants mapping to json file ---- # 
+        # ----- write participants mapping to json file ---- #
         mapping = {str(game_id): name for game_id, name, role, bot in self.data.assignment}
-        
+
         self.data.param["map_php"] = mapping
         self.data.write_param("map_php", mapping)
         self.data.write_param("assignment_php", self.data.assignment)
-        # --------------------------------------------------- # 
+        # --------------------------------------------------- #
 
-        # --------- Authorize participants to run game ------ # 
+        # --------- Authorize participants to run game ------ #
         self.server.side_queue.put(("authorize_participants", participants, roles, game_ids))
-        # --------------------------------------------------- # 
+        # --------------------------------------------------- #
 
         self.ask_interface("show_frame_parametrization")
 
-        # ------- Run game -----------------------------------# 
+        # ------- Run game -----------------------------------#
         self.log("UI ask 'run game'.")
         self.data.new()
         self.time_manager.setup()
         self.launch_game()
         self.game.new()
-        # --------------------------------------------------- # 
+        # --------------------------------------------------- #
 
     def ui_php_scan_button(self):
 
         self.server.side_queue.put(("get_waiting_list", ))
 
     def ui_php_erase_sql_tables(self, tables):
-        
+
         if self.running_server.is_set():
             self.server.side_queue.put(("erase_sql_tables", tables))
 
@@ -429,7 +390,7 @@ class Controller(Thread, Logger):
         name = self.id_manager.get_client_name_from_game_id(game_id)
 
         self.init.queue.put(name)
-        
+
     # ---------------------- Parameters management -------------------------------------------- #
 
     def get_current_data(self):

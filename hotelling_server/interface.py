@@ -4,8 +4,8 @@ from subprocess import getoutput
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QDesktopWidget, QMenuBar
 
-from .graphics import start_view, game_view, loading_view_tcp, loading_view_php, parametrization_view, \
-        setting_up_view, assignment_view_tcp, assignment_view_php, devices_view, menubar, config_files_view, \
+from .graphics import game_view, loading_view_php, parametrization_view, \
+        setting_up_view, assignment_view_php, devices_view, menubar, config_files_view, \
         erase_sql_tables_view, messenger, missing_players_view
 
 from utils.utils import Logger
@@ -37,7 +37,7 @@ class UI(QWidget, Logger, MessageBox):
         self.param = dict()
         self.old_param = dict()
 
-        # refresh interface and update data (tables, figures, messenger) 
+        # refresh interface and update data (tables, figures, messenger)
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
 
@@ -50,7 +50,7 @@ class UI(QWidget, Logger, MessageBox):
         self.queue = Queue()
 
         self.communicate = Communicate()
-        
+
         self.settings = QSettings("HumanoidVsAndroid", "Duopoly")
 
         self.controller_queue = None
@@ -66,8 +66,8 @@ class UI(QWidget, Logger, MessageBox):
         h = dimensions.height() * 0.8  # 80% of the screen height
 
         return 300, 100, w, h
-    
-    # ------------------------ Called by controller methods ---------------------------------------- # 
+
+    # ------------------------ Called by controller methods ---------------------------------------- #
 
     def set_previous_parameters(self, params):
         """Set previous json parameters from data through controller.
@@ -78,12 +78,6 @@ class UI(QWidget, Logger, MessageBox):
         # save old params
         self.old_param = params.copy()
 
-    def set_server_class_parametrization_frame(self, server_class):
-        """Set current server class (name) choice in order to know 
-        what views and options to display."""
-        
-        self.frames["parametrization"].set_next_frame_previous_frame_methods(server_class.name)
-    
     def set_server_address_game_frame(self, address):
         """Set server address displayed in game_view"""
 
@@ -107,15 +101,11 @@ class UI(QWidget, Logger, MessageBox):
 
         self.menubar_frames["messenger"].new_message_from_user(args[0], args[1])
 
-    def enable_server_related_menubar(self):
-
-        self.menubar.enable_actions()
-
-    # ----------------- called by views methods -------------------------------------------------------- # 
+    # ----------------- called by views methods -------------------------------------------------------- #
     def save_parameters(self, key, data):
 
         self.param[key] = data
-    # -------------------------------------------------------------------------------------------------- # 
+    # -------------------------------------------------------------------------------------------------- #
 
     def _get_parameters(self, *keys):
         """get selected params in order to pass them to view's constructors"""
@@ -128,27 +118,20 @@ class UI(QWidget, Logger, MessageBox):
         self.communicate.signal.connect(self.look_for_msg)
 
         # get saved geometry or set regular geometry
-        try: 
+        try:
             self.restoreGeometry(self.settings.value("geometry"))
 
         except Exception as e:
-            self.log(str(e), level=3) 
+            self.log(str(e), level=3)
             self.log("Setting regular dimensions", level=1)
             self.setGeometry(*self.dimensions)
 
-    def prepare_frames(self): 
+    def prepare_frames(self):
 
-        # ------------------- Main window frames ---------------------------- # 
-        self.frames["start"] = \
-            start_view.StartFrame(parent=self)
-
-        self.frames["load_game_new_game_tcp"] = \
-            loading_view_tcp.LoadGameNewGameFrameTCP(parent=self, 
-                param=self._get_parameters("network", "folders"))
-
+        # ------------------- Main window frames ---------------------------- #
         self.frames["load_game_new_game_php"] = \
-            loading_view_php.LoadGameNewGameFramePHP(parent=self, 
-                param=self._get_parameters("network", "folders"))
+            loading_view_php.LoadGameNewGameFramePHP(parent=self,
+                param=self._get_parameters("network", "folders", "game"))
 
         self.frames["devices"] = \
             devices_view.DevicesFrame(parent=self,
@@ -158,22 +141,18 @@ class UI(QWidget, Logger, MessageBox):
             assignment_view_php.AssignmentFramePHP(parent=self,
                 param=self._get_parameters("game", "assignment_php", "sql_tables"))
 
-        self.frames["assign_tcp"] = \
-            assignment_view_tcp.AssignmentFrameTCP(parent=self,
-                param=self._get_parameters("game", "assignment_tcp"))
-
         self.frames["parametrization"] = \
             parametrization_view.ParametersFrame(parent=self,
                 param=self._get_parameters("parametrization"))
 
         self.frames["game"] = \
-            game_view.GameFrame(parent=self, 
+            game_view.GameFrame(parent=self,
                 param=self._get_parameters("network"))
-                    
+
         self.frames["setting_up"] = \
             setting_up_view.SettingUpFrame(parent=self)
 
-        # ------------------- Menu bar frames ---------------------------- # 
+        # ------------------- Menu bar frames ---------------------------- #
 
         self.menubar_frames["config_files"] = \
             config_files_view.ConfigFilesWindow(parent=self,
@@ -190,8 +169,8 @@ class UI(QWidget, Logger, MessageBox):
             missing_players_view.MissingPlayersFrame(parent=self,
             param=self._get_parameters("game"))
 
-        # ---------------------------------------------------------------- # 
-    
+        # ---------------------------------------------------------------- #
+
     def prepare_window(self):
 
         self.setWindowTitle(self.app_name)
@@ -209,7 +188,7 @@ class UI(QWidget, Logger, MessageBox):
         self.setLayout(self.layout)
 
     def closeEvent(self, event):
-        
+
         msg = "By quitting, you will erase ('participants', 'response', 'request'," "'waiting_list') sql tables."
         question = "Are you sure you want to quit?"
         focus = "Yes"
@@ -224,10 +203,9 @@ class UI(QWidget, Logger, MessageBox):
             self.log("Close window", level=1)
             self.close_menubar_windows()
 
-            # stop timers
-            self.timer.stop()
+            # ---- stop timers ----- #
 
-            if getattr(self.frames["assign_php"], "timer"):
+            if getattr(self.frames["assign_php"], "timer") is not None:
                 self.frames["assign_php"].timer.stop()
 
             self.close_window()
@@ -247,14 +225,14 @@ class UI(QWidget, Logger, MessageBox):
         self.settings.setValue("geometry", self.saveGeometry())
 
     def check_for_erasing_tables(self):
-        tables = "participants", "waiting_list", "request", "response"
 
+        tables = "participants", "waiting_list", "request", "response"
         self.php_erase_sql_tables(tables=tables)
 
     def check_for_saving_parameters(self):
 
         self.already_asked_for_saving_parameters = 1
-        
+
         cond = sorted(self.old_param.items()) != sorted(self.param.items())
 
         if cond:
@@ -262,15 +240,15 @@ class UI(QWidget, Logger, MessageBox):
             if self.show_question("Do you want to save the change in parameters and assignment?"):
 
                 # assignment_php is the only param we do not want to save
-                self.param.pop("assignment_php") 
+                self.param.pop("assignment_php")
 
                 for key in self.param.keys():
                     self.write_parameters(key, self.param[key])
 
             else:
                 self.log('Saving of parameters aborted.', level=1)
-    
-    # ------------------------- Called every second methods ------------------------------------- # 
+
+    # ------------------------- Called every second methods ------------------------------------- #
 
     def update_figures(self, data):
         self.frames["game"].update_statistics(data["statistics"])
@@ -278,8 +256,8 @@ class UI(QWidget, Logger, MessageBox):
     def update_tables(self, data):
         self.frames["game"].update_tables(data)
         self.frames["game"].set_trial_number(data["time_manager_t"])
-    
-    # ------------------------- Method used in order to treat requests from controller ------------ # 
+
+    # ------------------------- Method used in order to treat requests from controller ------------ #
 
     def look_for_msg(self):
 
@@ -303,16 +281,7 @@ class UI(QWidget, Logger, MessageBox):
             # noinspection PyCallByClass, PyTypeChecker
             QTimer.singleShot(100, self.look_for_msg)
 
-    # ------------------------- "Show" methods -------------------------------------------------- # 
-
-    def show_frame_start(self):
-
-        for frame in self.frames.values():
-            frame.hide()
-
-        self.frames["start"].prepare()
-        self.frames["start"].show()
-
+    # ------------------------- "Show" methods -------------------------------------------------- #
     def show_frame_devices(self):
 
         for frame in self.frames.values():
@@ -320,14 +289,6 @@ class UI(QWidget, Logger, MessageBox):
 
         self.frames["devices"].prepare()
         self.frames["devices"].show()
-
-    def show_frame_load_game_new_game_tcp(self):
-
-        for frame in self.frames.values():
-            frame.hide()
-
-        self.frames["load_game_new_game_tcp"].prepare()
-        self.frames["load_game_new_game_tcp"].show()
 
     def show_frame_load_game_new_game_php(self):
 
@@ -361,20 +322,12 @@ class UI(QWidget, Logger, MessageBox):
         self.frames["parametrization"].prepare()
         self.frames["parametrization"].show()
 
-    def show_frame_assignment_tcp(self):
+    def show_frame_assignment_php(self, missing_players, autostart):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["assign_tcp"].prepare()
-        self.frames["assign_tcp"].show()
-
-    def show_frame_assignment_php(self):
-
-        for frame in self.frames.values():
-            frame.hide()
-
-        self.frames["assign_php"].prepare()
+        self.frames["assign_php"].prepare(missing_players, autostart)
         self.frames["assign_php"].show()
 
     def show_menubar_frame_config_files(self):
@@ -393,7 +346,7 @@ class UI(QWidget, Logger, MessageBox):
 
         self.menubar_frames["missing_players"].show()
 
-    # ---------------------------------------------------------------------------------------------------------- #  
+    # ---------------------------------------------------------------------------------------------------------- #
 
     def error_loading_session(self):
 
@@ -428,9 +381,10 @@ class UI(QWidget, Logger, MessageBox):
         reply_yes = self.show_question(msg=msg, question=question, yes=yes, no=no)
 
         if reply_yes:
-            self.show_frame_start()
+            self.show_frame_load_game_new_game_php()
             self.stop_bots()
             self.force_to_stop_game()
+            self.check_for_erasing_tables()
 
         else:
             self.frames["game"].stop_button.setEnabled(True)
@@ -447,7 +401,6 @@ class UI(QWidget, Logger, MessageBox):
         go_back = self.show_question(msg=msg, question=question, yes=yes, no=no)
 
         if go_back:
-            self.show_frame_assignment_tcp()
             self.stop_bots()
             self.stop_server()
 
@@ -467,29 +420,11 @@ class UI(QWidget, Logger, MessageBox):
         if not want_to_quit:
             self.frames["devices"].save_mapping()
 
-        self.show_frame_load_game_new_game_tcp()
+    # ----------------- Methods putting something in controller queue -------------- #
 
-    def fatal_error_of_communication(self):
-
-        ok = self.show_critical_and_ok(
-            msg="Fatal error of communication. You need to relaunch the game AFTER "
-                "having relaunched the apps on Android's clients.")
-
-        if ok:
-            self.show_frame_load_game_new_game_tcp()
-
-        else:
-            if not self.close():
-                self.manage_fatal_error_of_communication()
-                
-    # ----------------- Methods putting something in controller queue -------------- # 
-    
     def update_game_view_data(self):
         self.controller_queue.put(("ui_update_game_view_data", ))
 
-    def tcp_run_game(self):
-        self.controller_queue.put(("ui_tcp_run_game", ))
-    
     def load_game(self, file):
         self.controller_queue.put(("ui_load_game", file))
 
@@ -537,7 +472,7 @@ class UI(QWidget, Logger, MessageBox):
 
     def set_parametrization(self, param):
         self.controller_queue.put(("ui_set_parametrization", param))
-    
+
     def set_server_parameters(self, param):
         self.controller_queue.put(("ui_set_server_parameters", param))
 
@@ -548,5 +483,3 @@ class UI(QWidget, Logger, MessageBox):
         self.controller_queue.put(("ui_php_set_missing_players", value))
 
     # ---------------------- #
-
-    

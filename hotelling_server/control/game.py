@@ -88,8 +88,11 @@ class Game(Logger):
     def launch_bots(self):
         """launch bots based on assignment settings"""
 
+        # count bot agents
         n_firms = 0
         n_customers = 0
+
+        # count non bots agents and wait for them before running
         n_agents_to_wait = 0
 
         for game_id, server_id, role, bot in self.assignment:
@@ -104,6 +107,8 @@ class Game(Logger):
                 HotellingLocalBots(
                     self.controller, n_firms, n_customers, n_agents_to_wait,
                     self.interface_parameters["condition"])
+
+
             self.bots.start()
 
     def stop_bots(self):
@@ -245,9 +250,6 @@ class Game(Logger):
     def check_end(self, client_t):
         return int(client_t == self.time_manager.ending_t) if self.time_manager.ending_t else 0
 
-    def is_php(self):
-        return self.controller.server.name == "PHPServer"
-
     def reply(self, *args):
 
         msg = {
@@ -256,10 +258,10 @@ class Game(Logger):
                 [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args[1:]]
             ))}
 
-        return ("reply", msg) if self.is_php() else ("reply", msg["response"])
+        return ("reply", msg) 
 
     def reply_error(self, msg):
-        return ("error", msg) if self.is_php() else ("reply", "error/{}".format(msg))
+        return ("error", msg) 
 
     def get_all_states(self):
         return self.data.current_state["firm_states"] + self.data.current_state["customer_states"]

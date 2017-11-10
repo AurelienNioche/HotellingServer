@@ -33,24 +33,13 @@ class MenuBar(QMenuBar, Logger):
         
         # Erase sql tables
         self.erase_sql_tables.triggered.connect(self.parent().show_menubar_frame_erase_sql_tables) 
-        self.erase_sql_tables.setEnabled(False)
         self.action_menu.addAction(self.erase_sql_tables)
 
         # Messenger
         self.messenger.triggered.connect(self.parent().show_menubar_frame_messenger)
-        self.messenger.setEnabled(False)
         self.action_menu.addAction(self.messenger)
 
         # Missing Players
         self.missing_players.triggered.connect(self.parent().show_menubar_frame_missing_players)
-        self.missing_players.setEnabled(False)
         self.action_menu.addAction(self.missing_players)
-
-    def enable_actions(self):
-
-        self.erase_sql_tables.setEnabled(True)
-        self.messenger.setEnabled(True)
-        self.missing_players.setEnabled(True)
-
-
 

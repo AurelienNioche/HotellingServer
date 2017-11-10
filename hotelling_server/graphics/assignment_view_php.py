@@ -24,22 +24,23 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.next_button = QPushButton("Next")
         self.previous_button = QPushButton("Previous")
-        self.erase_tables_button = QPushButton("Erase SQL tables")
-        self.missing_players_button = QPushButton("Set missing players")
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
-        self.group.addButton(self.erase_tables_button)
-        
+
         # assignments widgets (list of game id, server id, role, bot)
         self.list_group = QGroupBox("Set assignments")
         self.list_widget = QWidget()
         self.list_scroll_area = QScrollArea()
 
-        self.timer = None 
         self.parameters = dict()
+
+        # those attributs will be set in prepare method
+        self.missing_players = None
+        self.timer = None
+        self.autostart = None
 
         self.error = None
 
@@ -74,10 +75,6 @@ class AssignmentFramePHP(Logger, QWidget):
         self.next_button.clicked.connect(self.push_next_button)
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
-        # noinspection PyUnresolvedReferences
-        self.erase_tables_button.clicked.connect(self.push_erase_tables_button)
-        # noinspection PyUnresolvedReferences
-        self.missing_players_button.clicked.connect(self.push_missing_players_button)
 
         self.next_button.setAutoDefault(True)
         self.next_button.setDefault(True)
@@ -119,16 +116,22 @@ class AssignmentFramePHP(Logger, QWidget):
         self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
         
-        self.layout.addWidget(self.missing_players_button, alignment=Qt.AlignCenter)
-        self.layout.addWidget(self.erase_tables_button, alignment=Qt.AlignCenter)
-
         self.setLayout(self.layout)
 
-    def prepare(self):
-        
+    def prepare(self, missing_players, autostart):
+
+        # set missing players
+        # if missing players nb is reach
+        # and if autostart option is checked
+        # run game
+        self.missing_players = int(missing_players)
+        self.autostart = autostart
+
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
         self.setFocus()
+
+        # update waiting list view
         self.timer = Timer(self, self.ask_for_updating_waiting_list, 1000)
         self.timer.start()
 
@@ -175,22 +178,8 @@ class AssignmentFramePHP(Logger, QWidget):
             self.log("Push 'previous' button.")
             self.parent().show_frame_load_game_new_game_php()
 
-    def push_erase_tables_button(self):
-
-        self.erase_tables_button.setEnabled(False)
-
-        self.parent().show_menubar_frame_erase_sql_tables()
-
-        self.erase_tables_button.setEnabled(True)
-
-    def push_missing_players_button(self):
-
-        self.missing_players_button.setEnabled(False)
-
-        self.parent().show_menubar_frame_missing_players()
-
-        self.missing_players_button.setEnabled(True)
     # ------------------------------------------------------------------------------- #
+
     def ask_for_updating_waiting_list(self):
         self.parent().php_scan_button()
 
@@ -203,6 +192,10 @@ class AssignmentFramePHP(Logger, QWidget):
                 check_box = self.parameters["assign"][i]["bot"].check_box  # check box widget (bot or not)
 
                 self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
+
+            # if autostart is set run the game
+            if len(participants) == self.missing_players and self.autostart:
+                self.push_next_button()
 
         else:
             

@@ -1,1 +1,1 @@
-{"save": true, "exploration_cost": 1, "utility_consumption": 20, "customer_view": 5}
+{"save": true, "exploration_cost": 1, "utility_consumption": 20, "condition": "high_t_cost"}

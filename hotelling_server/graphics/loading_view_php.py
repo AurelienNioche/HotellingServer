@@ -2,7 +2,7 @@ from os import path
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QFileDialog, QGridLayout, \
-    QLineEdit, QLabel, QHBoxLayout
+    QLineEdit, QLabel, QHBoxLayout, QCheckBox
 
 from utils.utils import Logger
 
@@ -33,12 +33,14 @@ class LoadGameNewGameFramePHP(QWidget, Logger):
 
         grid_layout = QGridLayout()
 
+        self.widgets["autostart"] = QCheckBox()
         self.widgets["php_server"] = QLineEdit()
-        
+        self.widgets["missing_players"] = QLineEdit()
+
         for i, (label, widget) in sorted(enumerate(self.widgets.items())):
 
             grid_layout.addWidget(QLabel(label), i, 0, alignment=Qt.AlignLeft)
-            grid_layout.addWidget(widget, i, 1, alignment=Qt.AlignCenter)
+            grid_layout.addWidget(widget, i, 1, alignment=Qt.AlignLeft)
 
         self.layout.addLayout(grid_layout)
 
@@ -59,18 +61,37 @@ class LoadGameNewGameFramePHP(QWidget, Logger):
         self.setFocus()
         self.buttons["new"].setFocus()
         self.set_buttons_activation(True)
+        self.prepare_missing_players()
         self.prepare_network()
+        self.prepare_autostart()
 
     def prepare_network(self):
 
         label = self.param["network"]["php_server"]
         self.widgets["php_server"].setText(label)
+        self.widgets["php_server"].adjustSize()
+
+    def prepare_missing_players(self):
+
+        label = str(self.param["network"]["missing_players"])
+        self.widgets["missing_players"].setText(label)
+
+    def prepare_autostart(self):
+
+        checked = self.param["network"]["autostart"]
+        self.widgets["autostart"].setChecked(checked)
 
     def click_new_game(self):
 
         self.save_network_parameters()
+        self.erase_sql_tables()
+        self.set_missing_players()
         self.set_buttons_activation(False)
-        self.parent().show_frame_assignment_php()
+
+        missing_players = self.widgets["missing_players"].text()
+        autostart = self.widgets["autostart"].isChecked()
+
+        self.parent().show_frame_assignment_php(missing_players=missing_players, autostart=autostart)
 
     def click_load_game(self):
 
@@ -106,3 +127,11 @@ class LoadGameNewGameFramePHP(QWidget, Logger):
 
         self.parent().set_server_parameters(self.param)
         self.parent().save_parameters("network", self.param["network"])
+
+    def set_missing_players(self):
+
+        self.parent().set_missing_players(self.widgets["missing_players"].text())
+
+    def erase_sql_tables(self):
+
+        self.parent().check_for_erasing_tables()

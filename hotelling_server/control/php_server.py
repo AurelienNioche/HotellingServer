@@ -6,13 +6,40 @@ import json
 from utils.utils import Logger
 
 
-class BasePHPServer(Thread, Logger):
+class RequestManager:
 
+    name = "RequestManager"
+    request_frequency = 0.1
+
+    def send_request(self, **kwargs):
+
+        while True:
+            try:
+                return rq.get(self.server_address, params=kwargs)
+
+            except (ConnectionError, Exception):
+                Logger.log("I got a connection error. Try again.", level=3)
+                Event().wait(self.request_frequency)
+
+    def send_request_messenger(self, **kwargs):
+
+        while True:
+            try:
+                return rq.post(self.server_address_messenger, data=kwargs)
+
+            except (ConnectionError, Exception):
+                Logger.log("I got a connection error. Try again.", level=3)
+                Event().wait(self.request_frequency)
+
+
+class PHPServer(Thread, RequestManager, Logger):
+
+    name = "PHPServer"
     request_frequency = 0.1
 
     def __init__(self, controller):
 
-        Thread.__init__(self)
+        super().__init__()
 
         self.cont = controller
 
@@ -234,42 +261,19 @@ class BasePHPServer(Thread, Logger):
         self.serve_event.clear()
 
     def end(self):
-        self.shutdown_event.set()
+
+        # when server shutdowns, erase tables and tell
+        # tables server is not running anymore
+
+        if self.setup_done:
+
+            tables = ("participants", "waiting_list", "request", "response")
+            self.ask_for_erasing_tables(tables=tables)
+            self.set_server_is_not_running_anymore()
+
         self.serve_event.clear()
-        self.set_server_is_not_running_anymore()
+        self.shutdown_event.set()
         self.main_queue.put("break")
-
-
-class RequestManager:
-
-    def send_request(self, **kwargs):
-        
-        while True:
-            try:
-                return rq.get(self.server_address, params=kwargs)
-
-            except Exception:
-                self.log("I got a connection error. Try again.", level=3)
-                Event().wait(self.request_frequency)
-    
-    def send_request_messenger(self, **kwargs):
-
-        while True:
-            try:
-                return rq.post(self.server_address_messenger, data=kwargs)
-
-            except Exception:
-                self.log("I got a connection error. Try again.", level=3)
-                Event().wait(self.request_frequency)
-
-
-class PHPServer(BasePHPServer, RequestManager):
-
-    name = "PHPServer"
-
-    def __init__(self, controller):
-        
-        super().__init__(controller)
 
     def get_waiting_list(self):
 
@@ -283,7 +287,7 @@ class PHPServer(BasePHPServer, RequestManager):
             )
 
             if response.text and response.text.split("&")[0] == "waiting_list":
-            
+
                 participants = [i for i in response.text.split("&")[1:] if i]
                 break
 
@@ -301,11 +305,11 @@ class PHPServer(BasePHPServer, RequestManager):
             )
 
             if response.text and response.text.split("&")[0] == "users":
-            
+
                 users = [i.split("#") for i in response.text.split("&")[1:] if i]
                 break
 
-        return users 
+        return users
 
     def register_users(self, usernames, passwords):
 
@@ -396,4 +400,3 @@ class PHPServer(BasePHPServer, RequestManager):
 
             if response.text == "I updated missing players in 'game' table.":
                 break
-
