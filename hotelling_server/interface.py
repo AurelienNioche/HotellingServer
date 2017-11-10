@@ -401,6 +401,7 @@ class UI(QWidget, Logger, MessageBox):
         file = self.open_file_dialog()
 
         if file:
+            self.set_server_parameters(param=self.param)
             self.load_game(file)
 
         else:
