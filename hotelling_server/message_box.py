@@ -20,9 +20,9 @@ class MessageBox:
 
     def show_warning(self, msg):
 
-        button_reply = QMessageBox().warning(
-            self, "", msg,
-            QMessageBox.Ok
+        button_reply = QMessageBox.warning(
+            self, "Warning", msg,
+            QMessageBox.Ok,
         )
 
         return button_reply == QMessageBox.Yes
@@ -30,7 +30,7 @@ class MessageBox:
     def show_critical_and_retry(self, msg):
 
         button_reply = QMessageBox().critical(
-            self, "", msg,  # Parent, title, message
+            self, "Error", msg,  # Parent, title, message
             QMessageBox.Close | QMessageBox.Retry,  # Buttons
             QMessageBox.Retry  # Default button
         )
@@ -40,7 +40,7 @@ class MessageBox:
     def show_critical_and_ok(self, msg):
 
         button_reply = QMessageBox().critical(
-            self, "", msg,  # Parent, title, message
+            self, "Error", msg,  # Parent, title, message
             QMessageBox.Close | QMessageBox.Ok,  # Buttons
             QMessageBox.Ok  # Default button
         )
@@ -50,13 +50,13 @@ class MessageBox:
     def show_critical(self, msg):
 
         QMessageBox().critical(
-            self, "", msg,  # Parent, title, message
+            self, "Error", msg,  # Parent, title, message
             QMessageBox.Close
         )
 
     def show_info(self, msg):
 
         QMessageBox().information(
-            self, "", msg,
+            self, "Info", msg,
             QMessageBox.Ok
         )

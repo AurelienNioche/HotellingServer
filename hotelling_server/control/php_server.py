@@ -1,7 +1,7 @@
+import json
 from multiprocessing import Queue, Event
 from threading import Thread, Event
 import requests as rq
-import json
 
 from utils.utils import Logger
 
@@ -81,13 +81,13 @@ class PHPServer(Thread, RequestManager, Logger):
 
             if response.text == "I updated is_running variable from server_is_running.":
                 break
-            
+
             elif response.text == "Another server seems to be running.":
 
                 self.log("Another server seems to be running! Game could be compromised!", level=3)
                 self.cont.queue.put((
-                    "ask_interface", 
-                    "show_critical_and_ok", 
+                    "ask_interface",
+                    "show_critical_and_ok",
                     "Another server seems to be running! Game could be compromised!"))
 
                 break
@@ -101,7 +101,7 @@ class PHPServer(Thread, RequestManager, Logger):
             self.log("I received msg '{}'.".format(msg))
 
             if msg and msg[0] == "serve":
-                
+
                 self.serve_event.set()
                 self.serve()
 
@@ -112,8 +112,8 @@ class PHPServer(Thread, RequestManager, Logger):
         while self.serve_event.is_set():
 
             self.treat_sides_requests()
-            
-            if self.running_game.is_set(): 
+
+            if self.running_game.is_set():
                 self.treat_game_requests()
 
             Event().wait(self.request_frequency)
@@ -254,8 +254,8 @@ class PHPServer(Thread, RequestManager, Logger):
             self.log("I receive: {}".format(response.text))
 
             if response.text == "Updated is_running to 0.":
-                self.log("Server is not running anymore on SQL tables.", level=1) 
-                break 
+                self.log("Server is not running anymore on SQL tables.", level=1)
+                break
 
     def stop_to_serve(self):
         self.serve_event.clear()

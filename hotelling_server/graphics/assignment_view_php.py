@@ -46,8 +46,6 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.setup_done = False
 
-        self.setup()
-
     def setup(self):
 
         # noinspection PyUnusedLocal
@@ -123,6 +121,8 @@ class AssignmentFramePHP(Logger, QWidget):
         # get params from interface
         self.missing_players = param["network"]["missing_players"]
         self.autostart = param["network"]["autostart"]
+        
+        self.setup()
 
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
@@ -145,7 +145,7 @@ class AssignmentFramePHP(Logger, QWidget):
                 checked=roles[i], idx=i)
 
             self.parameters["assign"][i]["bot"] = CheckParameter(parent=self,
-                checked=True, idx=i)
+                checked=(False if i < self.missing_players else True), idx=i)
 
     # ---------------------- PUSH BUTTONS --------------------------------- #
 
@@ -154,7 +154,7 @@ class AssignmentFramePHP(Logger, QWidget):
         warning = self.check_assignment_validity()
 
         if warning:
-            self.show_warning(msg=warning)
+            self.parent().show_warning(msg=warning)
 
         else:
             self.log("Push 'next' button.")
@@ -176,7 +176,7 @@ class AssignmentFramePHP(Logger, QWidget):
 
         if self.error:
 
-            self.show_warning(msg=self.error)
+            self.parent().show_warning(msg=self.error)
 
         else:
             self.log("Push 'previous' button.")
@@ -202,10 +202,10 @@ class AssignmentFramePHP(Logger, QWidget):
                 self.push_next_button()
 
         else:
-
-            # if not participants reset server_id widget
-            for line in self.parameters["assign"]:
-                self.disable_line_edit(line["server_id"].edit)
+            
+            for i in range(self.missing_players):
+                line_edit = self.parameters["assign"][i]["server_id"].edit  # line edit widget (server id)
+                self.disable_line_edit(line_edit, name="Waiting for a player")
 
     # ----------------------------- assignment validity checking -------------------------------------------------- #
 
@@ -217,6 +217,9 @@ class AssignmentFramePHP(Logger, QWidget):
         for i, (game_id, server_id, role, bot) in assignment:
 
             n_firm += role == "firm"
+
+            if "Waiting" in server_id:
+                return "Players are still missing!"
 
             for j, (other_game_id, other_server_id, other_role, other_bot) in assignment:
 
@@ -256,13 +259,6 @@ class AssignmentFramePHP(Logger, QWidget):
         return [[int(i["game_id"].get_value()), i["server_id"].get_value(), i["role"].get_value(), i["bot"].get_value()]
                 for i in self.parameters["assign"]]
 
-    def show_warning(self, **instructions):
-
-        QMessageBox().warning(
-            self, "", instructions["msg"],
-            QMessageBox.Ok
-        )
-
     def switch_line_edit(self, idx, from_line):
 
         if self.setup_done:
@@ -280,9 +276,9 @@ class AssignmentFramePHP(Logger, QWidget):
                 self.disable_line_edit(line_edit)
 
     @staticmethod
-    def disable_line_edit(line_edit):
+    def disable_line_edit(line_edit, name="Bot"):
 
-        line_edit.setText("Bot")
+        line_edit.setText(name)
 
     @staticmethod
     def enable_line_edit(line_edit, check_box, name=""):
@@ -366,11 +362,13 @@ class CheckParameter(object):
         self.setup(checked)
 
     def setup(self, checked):
+
         # noinspection PyUnresolvedReferences
         self.check_box.stateChanged.connect(
             lambda: self.parent.switch_line_edit(idx=self.idx, from_line=False))
 
         self.check_box.setChecked(checked)
+        self.check_box.setEnabled(False)
 
     def get_value(self):
         return self.check_box.isChecked()
@@ -434,6 +432,6 @@ class Timer(Thread):
 
             try:
                 self.func()
-                Event().wait(np.random.randint(3))
+                Event().wait(np.random.randint(2))
             except:
-                Event().wait(np.random.randint(3))
+                Event().wait(np.random.randint(2))

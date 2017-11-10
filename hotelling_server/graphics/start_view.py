@@ -42,7 +42,7 @@ class NetworkParameters(ParametersFrame):
                 StringParameter(text="Messenger address", initial_value=param["messenger"])
 
         self.widgets["missing_players"] = \
-                IntParameter(text="Missing players", initial_value=param["missing_players"], value_range=[0, 100])
+                IntParameter(text="Real players", initial_value=param["missing_players"], value_range=[0, 100])
 
         self.fill_layout()
 
