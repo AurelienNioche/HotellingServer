@@ -1,11 +1,11 @@
+from os import path
 from multiprocessing import Queue, Event
-from subprocess import getoutput
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QDesktopWidget, QMenuBar
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QDesktopWidget, QFileDialog
 
-from .graphics import game_view, loading_view_php, parametrization_view, \
-        setting_up_view, assignment_view_php, devices_view, menubar, config_files_view, \
+from .graphics import game_view, start_view, parametrization_view, \
+        setting_up_view, assignment_view_php, menubar, config_files_view, \
         erase_sql_tables_view, messenger, missing_players_view
 
 from utils.utils import Logger
@@ -19,7 +19,7 @@ class Communicate(QObject):
 class UI(QWidget, Logger, MessageBox):
 
     name = "Interface"
-    app_name = "Android Experiment"
+    app_name = "Duopoly Experiment"
 
     def __init__(self, model):
 
@@ -88,11 +88,6 @@ class UI(QWidget, Logger, MessageBox):
 
         self.frames["game"].set_assignment(assignment)
 
-    def stop_scanning_network(self):
-
-        self.log("Controller asks 'stop scanning network'")
-        self.frames["devices"].show_device_added()
-
     def update_waiting_list_assignment_frame(self, participants):
 
         self.frames["assign_php"].update_waiting_list(participants)
@@ -129,13 +124,9 @@ class UI(QWidget, Logger, MessageBox):
     def prepare_frames(self):
 
         # ------------------- Main window frames ---------------------------- #
-        self.frames["load_game_new_game_php"] = \
-            loading_view_php.LoadGameNewGameFramePHP(parent=self,
-                param=self._get_parameters("network", "folders", "game"))
-
-        self.frames["devices"] = \
-            devices_view.DevicesFrame(parent=self,
-                param=self._get_parameters("network", "map_android_id_server_id"))
+        self.frames["start"] = \
+            start_view.StartFrame(parent=self,
+                param=self._get_parameters("network", "folders", "game", "parametrization"))
 
         self.frames["assign_php"] = \
             assignment_view_php.AssignmentFramePHP(parent=self,
@@ -282,22 +273,6 @@ class UI(QWidget, Logger, MessageBox):
             QTimer.singleShot(100, self.look_for_msg)
 
     # ------------------------- "Show" methods -------------------------------------------------- #
-    def show_frame_devices(self):
-
-        for frame in self.frames.values():
-            frame.hide()
-
-        self.frames["devices"].prepare()
-        self.frames["devices"].show()
-
-    def show_frame_load_game_new_game_php(self):
-
-        for frame in self.frames.values():
-            frame.hide()
-
-        self.frames["load_game_new_game_php"].prepare()
-        self.frames["load_game_new_game_php"].show()
-
     def show_frame_game(self):
 
         self.frames["game"].prepare()
@@ -314,20 +289,20 @@ class UI(QWidget, Logger, MessageBox):
 
         self.frames["setting_up"].show()
 
-    def show_frame_parametrization(self):
+    def show_frame_start(self):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["parametrization"].prepare()
-        self.frames["parametrization"].show()
+        self.frames["start"].prepare()
+        self.frames["start"].show()
 
-    def show_frame_assignment_php(self, missing_players, autostart):
+    def show_frame_assignment_php(self):
 
         for frame in self.frames.values():
             frame.hide()
 
-        self.frames["assign_php"].prepare(missing_players, autostart)
+        self.frames["assign_php"].prepare(param=self._get_parameters("network"))
         self.frames["assign_php"].show()
 
     def show_menubar_frame_config_files(self):
@@ -381,7 +356,7 @@ class UI(QWidget, Logger, MessageBox):
         reply_yes = self.show_question(msg=msg, question=question, yes=yes, no=no)
 
         if reply_yes:
-            self.show_frame_load_game_new_game_php()
+            self.show_frame_start()
             self.stop_bots()
             self.force_to_stop_game()
             self.check_for_erasing_tables()
@@ -407,18 +382,29 @@ class UI(QWidget, Logger, MessageBox):
         else:
             self.frames["game"].stop_button.setEnabled(True)
 
-    def devices_quit_without_saving(self):
+    def open_file_dialog(self):
 
-        msg = "You did not save your modifications."
-        question = "Quit without saving?"
-        yes = "Quit"
-        no = "Save and quit"
-        focus = "Quit"
+        folder_to_open = path.expanduser(self.param["folders"]["save"])
 
-        want_to_quit = self.show_question(msg=msg, question=question, yes=yes, no=no, focus=focus)
+        # noinspection PyArgumentList
+        file_choice = QFileDialog().getOpenFileName(
+            self, '',
+            folder_to_open,
+            "Backup files (*.p)")
+        self.log("User choose file '{}'.".format(file_choice))
+        file = file_choice[0]
 
-        if not want_to_quit:
-            self.frames["devices"].save_mapping()
+        return file
+
+    def open_file_to_load_game(self):
+
+        file = self.open_file_dialog()
+
+        if file:
+            self.load_game(file)
+
+        else:
+            self.show_info(msg="No file selected.")
 
     # ----------------- Methods putting something in controller queue -------------- #
 

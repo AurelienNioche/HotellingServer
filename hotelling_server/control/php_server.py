@@ -17,8 +17,8 @@ class RequestManager:
             try:
                 return rq.get(self.server_address, params=kwargs)
 
-            except (ConnectionError, Exception):
-                Logger.log("I got a connection error. Try again.", level=3)
+            except Exception as e:
+                Logger.log("I got a connection error. Try again.\n" + str(e), level=3)
                 Event().wait(self.request_frequency)
 
     def send_request_messenger(self, **kwargs):
@@ -27,8 +27,8 @@ class RequestManager:
             try:
                 return rq.post(self.server_address_messenger, data=kwargs)
 
-            except (ConnectionError, Exception):
-                Logger.log("I got a connection error. Try again.", level=3)
+            except Exception as e:
+                Logger.log("I got a connection error. Try again.\n" + str(e), level=3)
                 Event().wait(self.request_frequency)
 
 

@@ -1,1 +1,1 @@
-{"autostart": true, "missing_players": 2, "php_server": "http://duopoly.free.fr/server_request_with_id.php", "messenger": "http://duopoly.free.fr/messenger.php"}
+{"autostart": true, "php_server": "http://duopoly.free.fr/server_request_with_id.php", "messenger": "http://duopoly.free.fr/messenger.php", "missing_players": 1}

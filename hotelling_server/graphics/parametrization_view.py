@@ -89,7 +89,8 @@ class ParametersFrame(QWidget, Logger):
 
         else:
             self.log("Push 'run' button.")
-
+            
+            # ---- save parametrization ------ # 
             self.param["parametrization"] = self.get_widgets_values()
             self.parent().save_parameters("parametrization", self.param["parametrization"])
             self.parent().set_parametrization(self.param["parametrization"])

@@ -8,6 +8,7 @@ from hotelling_server.graphics.widgets.plot_layouts import PlotLayout
 from hotelling_server.graphics.widgets.plot import OneLinePlot, TwoLinesPlot
 from hotelling_server.graphics.widgets.trial_counter import TrialCounter
 from hotelling_server.graphics.widgets.table_layouts import TableLayout
+
 from utils.utils import Logger
 
 

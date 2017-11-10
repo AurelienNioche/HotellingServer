@@ -59,7 +59,7 @@ class Controller(Thread, Logger):
         self.ask_interface("show_frame_setting_up")
 
         # Start
-        self.ask_interface("show_frame_load_game_new_game_php")
+        self.ask_interface("show_frame_start")
 
         while not self.shutdown.is_set():
 
@@ -233,13 +233,6 @@ class Controller(Thread, Logger):
         self.data.parametrization = param
         self.data.condition = param["condition"]
 
-    def ui_tcp_run_game(self):
-        self.log("UI ask 'run game'.")
-        self.data.new()
-        self.time_manager.setup()
-        self.launch_game()
-        self.game.new()
-
     def ui_load_game(self, file):
         self.log("UI ask 'load game'.")
         self.data.load(file)
@@ -301,10 +294,11 @@ class Controller(Thread, Logger):
         if self.game.is_ended():
 
             # display start frame
-            self.ask_interface("show_frame_load_game_new_game_php")
+            self.ask_interface("show_frame_start")
 
             # stop bots
             self.game.stop_bots()
+            self.erase_tables()
 
         else:
 
@@ -335,7 +329,7 @@ class Controller(Thread, Logger):
         self.server.side_queue.put(("authorize_participants", participants, roles, game_ids))
         # --------------------------------------------------- #
 
-        self.ask_interface("show_frame_parametrization")
+        self.ask_interface("show_frame_game")
 
         # ------- Run game -----------------------------------#
         self.log("UI ask 'run game'.")

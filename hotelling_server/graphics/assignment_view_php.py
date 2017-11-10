@@ -1,7 +1,7 @@
 from PyQt5.QtCore import Qt, QObject, QEvent
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
     QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, \
-    QScrollArea, QMessageBox, QFormLayout, QDialog, QGroupBox
+    QScrollArea, QMessageBox, QGroupBox
 
 from threading import Thread, Event
 import numpy as np
@@ -17,12 +17,12 @@ class AssignmentFramePHP(Logger, QWidget):
 
         # noinspection PyArgumentList
         super().__init__(parent=parent)
-        
+
         self.param = param
 
         self.layout = QVBoxLayout()
 
-        self.next_button = QPushButton("Next")
+        self.next_button = QPushButton("Run!")
         self.previous_button = QPushButton("Previous")
 
         self.group = QButtonGroup()
@@ -63,7 +63,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.parameters["assign"] = [{} for i in range(n_agents)]
 
         self.new_setup(n_agents=n_agents, roles=roles)
-        
+
         # --------- fill layout ----------------------------------- #
 
         self.fill_layout(labels, n_agents)
@@ -82,7 +82,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.setup_done = True
 
     def fill_layout(self, labels, n_agents):
-        
+
         # prepare layout
         grid_layout = QGridLayout()
 
@@ -104,7 +104,7 @@ class AssignmentFramePHP(Logger, QWidget):
         horizontal_layout = QHBoxLayout()
         horizontal_layout.addWidget(self.previous_button, alignment=Qt.AlignCenter)
         horizontal_layout.addWidget(self.next_button, alignment=Qt.AlignCenter)
-        
+
         self.list_widget.setLayout(grid_layout)
         self.list_scroll_area.setWidget(self.list_widget)
 
@@ -115,17 +115,14 @@ class AssignmentFramePHP(Logger, QWidget):
 
         self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
-        
+
         self.setLayout(self.layout)
 
-    def prepare(self, missing_players, autostart):
+    def prepare(self, param):
 
-        # set missing players
-        # if missing players nb is reach
-        # and if autostart option is checked
-        # run game
-        self.missing_players = int(missing_players)
-        self.autostart = autostart
+        # get params from interface
+        self.missing_players = param["network"]["missing_players"]
+        self.autostart = param["network"]["autostart"]
 
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
@@ -138,9 +135,9 @@ class AssignmentFramePHP(Logger, QWidget):
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
-            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self, 
+            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self,
                 value=i, idx=i)
-            
+
             self.parameters["assign"][i]["server_id"] = IntParameter(parent=self,
                 value="Bot", idx=i)
 
@@ -161,11 +158,18 @@ class AssignmentFramePHP(Logger, QWidget):
 
         else:
             self.log("Push 'next' button.")
-                  
+
+            # get assignment
             self.param["assignment_php"] = self.get_parameters()
             self.parent().save_parameters("assignment_php", self.param["assignment_php"])
+
+            # set assignment and wait for controller to show game view
             self.parent().set_assignment(assignment=self.param["assignment_php"])
-            self.parent().show_frame_parametrization()
+
+            # run game 
+            self.parent().php_run_game()
+            
+            # stop refreshing waiting list
             self.timer.stop()
 
     def push_previous_button(self):
@@ -176,7 +180,7 @@ class AssignmentFramePHP(Logger, QWidget):
 
         else:
             self.log("Push 'previous' button.")
-            self.parent().show_frame_load_game_new_game_php()
+            self.parent().show_frame_start()
 
     # ------------------------------------------------------------------------------- #
 
@@ -184,7 +188,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.parent().php_scan_button()
 
     def update_waiting_list(self, participants):
-        
+
         if participants:
 
             for i, name in enumerate(participants):
@@ -198,7 +202,7 @@ class AssignmentFramePHP(Logger, QWidget):
                 self.push_next_button()
 
         else:
-            
+
             # if not participants reset server_id widget
             for line in self.parameters["assign"]:
                 self.disable_line_edit(line["server_id"].edit)
@@ -231,15 +235,15 @@ class AssignmentFramePHP(Logger, QWidget):
         nb_of_firm_to_add_or_remove = self.param["game"]["n_firms"] - n_firm
 
         for i, (game_id, server_id, role, bot) in assignment:
-            
+
             if i != idx:
 
                 if nb_of_firm_to_add_or_remove < 0:
-                    
+
                     if role == "firm":
                         self.parameters["assign"][i]["role"].customer.setChecked(True)
                         nb_of_firm_to_add_or_remove += 1
-                
+
                 elif  nb_of_firm_to_add_or_remove > 0:
 
                     if role == "customer":
@@ -251,7 +255,7 @@ class AssignmentFramePHP(Logger, QWidget):
     def get_parameters(self):
         return [[int(i["game_id"].get_value()), i["server_id"].get_value(), i["role"].get_value(), i["bot"].get_value()]
                 for i in self.parameters["assign"]]
-    
+
     def show_warning(self, **instructions):
 
         QMessageBox().warning(
@@ -340,7 +344,7 @@ class IntParameter(object):
         self.setup()
 
     def setup(self):
-        
+
         self.edit.setEnabled(False)
 
     def get_value(self):
@@ -430,7 +434,6 @@ class Timer(Thread):
 
             try:
                 self.func()
-                Event().wait(np.random.randint(4))
+                Event().wait(np.random.randint(3))
             except:
-                Event().wait(np.random.randint(4))
-
+                Event().wait(np.random.randint(3))

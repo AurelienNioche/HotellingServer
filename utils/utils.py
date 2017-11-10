@@ -18,7 +18,7 @@ def get_local_ip():
 
 class Logger:
 
-    debug = 1
+    debug = 0
 
     @classmethod
     def log(cls, msg, level=0):

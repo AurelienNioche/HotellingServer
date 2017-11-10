@@ -1,10 +1,13 @@
 import sys
+
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtGui import QIcon
 
 from . import interface, controller
 
 
 class Model:
+
     """Model class.
     Create the elements of the model, orchestrate their interactions.
     """
@@ -14,6 +17,7 @@ class Model:
         self.git_branch = "php_server"
 
         self.app = QApplication(sys.argv)
+        self.app.setWindowIcon(QIcon("img/icon.icns"))
         self.ui = interface.UI(model=self)
         self.controller = controller.Controller(model=self)
 
