@@ -1,1 +1,4 @@
-{"ip_local": "", "ip_address": "", "ip_autodetect": true, "port": 8081, "local": true, "php_server": ""}
+{ "autostart": true,
+  "missing_players": 0,
+  "php_server": "",
+  "messenger": ""}

@@ -1,6 +1,7 @@
 from datetime import datetime
 import inspect
 import socket
+import click
 
 
 def function_name():
@@ -17,11 +18,25 @@ def get_local_ip():
 
 class Logger:
 
-    name = "Logger"
     debug = 0
 
     @classmethod
     def log(cls, msg, level=0):
         
-        if cls.debug == level:
-            print("{} {}: {}".format(datetime.now().strftime("[%y/%m/%d %H:%M:%S:%f]"), cls.name, msg))
+        stamp = "{} {}: {}".format(datetime.now().strftime("[%y/%m/%d %H:%M:%S:%f]"), cls.name, msg)
+
+        # Colour codes for different error levels
+        colors = ["cyan", "green", "yellow", "red"]
+
+        # Labels for different log levels
+        log_levels = ["[Debug]   ", "[Info]    ", "[Warning] ", "[Error]   "]
+
+        # Display error level of log event, current time and log description
+        # If debug is enabled print all logs
+        if cls.debug:
+            click.echo(click.style(log_levels[level], fg=colors[level]) + stamp)
+
+        # If debug is disabled only print errors, warnings, and infos
+        elif not cls.debug and level > 0:
+            click.echo(click.style(log_levels[level], fg=colors[level]) + stamp)
+

@@ -75,7 +75,7 @@ class TCPServer(Thread, Logger):
         self.cont = controller
 
         self.controller_queue = self.cont.queue
-        self.queue = Queue()
+        self.main_queue = Queue()
 
         self.clients = {}
 
@@ -104,7 +104,7 @@ class TCPServer(Thread, Logger):
         while not self.shutdown_event.is_set():
 
             self.log("Waiting for a message...")
-            msg = self.queue.get()
+            msg = self.main_queue.get()
             self.log("I received msg '{}'.".format(msg))
 
             if msg and msg[0] == "Go":
@@ -116,7 +116,7 @@ class TCPServer(Thread, Logger):
                     server_address=(self.server_address, self.param["network"]["port"]),
                     cont=self.cont,
                     controller_queue=self.controller_queue,
-                    server_queue=self.queue
+                    server_queue=self.main_queue
                 )
 
                 self.controller_queue.put(("server_running", ))
@@ -134,7 +134,7 @@ class TCPServer(Thread, Logger):
 
     def end(self):
         self.shutdown_event.set()
-        self.queue.put("break")
+        self.main_queue.put("break")
 
     def check_client_connection(self, ip, response):
 

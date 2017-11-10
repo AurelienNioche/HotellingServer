@@ -5,6 +5,8 @@ from utils.utils import Logger
 
 class TimeManager(Logger):
 
+    name = "TimeManager"
+
     def __init__(self, controller):
         self.controller = controller
         self.data = controller.data

@@ -18,8 +18,8 @@ class ConfigFilesWindow(QWidget):
         self.setWindowTitle("Edit config files")
         self.param = param
 
-        self.save_button = QPushButton("Save changes for the current game.")
-        self.write_button = QPushButton("Writes changes to files.")
+        self.save_button = QPushButton("Save changes for the current game")
+        self.write_button = QPushButton("Writes changes to files")
 
         self.tab_values = dict()
         self.tabs = QTabWidget(self)

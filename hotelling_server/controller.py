@@ -3,7 +3,7 @@ from threading import Thread
 
 from utils.utils import Logger
 from hotelling_server.control import backup, data, game, statistician, \
-        id_manager, time_manager, initialization
+        id_manager, time_manager, initialization, php_server
 
 
 class Controller(Thread, Logger):
@@ -35,14 +35,13 @@ class Controller(Thread, Logger):
         self.game = game.Game(controller=self)
         self.init = initialization.Init(controller=self)
 
-        self.server = None
+        self.server = php_server.PHPServer(controller=self)
+        # To give signals to server
+        self.server_queue = self.server.main_queue
 
         # For giving instructions to graphic process
         self.graphic_queue = self.mod.ui.queue
         self.communicate = self.mod.ui.communicate
-
-        # For giving go signal to server
-        self.server_queue = None
 
     def run(self):
 
@@ -64,7 +63,7 @@ class Controller(Thread, Logger):
 
         while not self.shutdown.is_set():
 
-            self.log("Waiting for a message.", level=1)
+            self.log("Waiting for a message.")
             message = self.queue.get()
             self.handle_message(message)
 
@@ -77,12 +76,9 @@ class Controller(Thread, Logger):
         self.fatal_error.clear()
         self.continue_game.set()
         self.running_game.set()
-
-        self.start_server()
-
+        self.server.running_game.set()
         self.ask_interface("show_frame_game")
-
-        self.log("Game launched.")
+        self.log("Game launched.", level=1)
 
     def stop_game_first_phase(self):
 
@@ -92,24 +88,25 @@ class Controller(Thread, Logger):
 
     def stop_game_second_phase(self):
 
+        self.continue_game.clear()
         self.running_game.clear()
+        self.server.running_game.clear()
 
     def close_program(self):
 
-        self.log("Close program.")
-        self.running_game.set()
+        self.log("Close program.", level=1)
+        #self.running_game.set()
 
-        # server if it was not launched
-        if self.server_queue is not None:
-            self.server_queue.put(("Abort",))
-            self.server.shutdown()
-            self.server.end()
+        self.server_queue.put(("Abort",))
+        self.stop_server()
+        self.server.end()
 
         self.shutdown.set()
 
     def fatal_error_of_communication(self):
 
         if not self.fatal_error.is_set():
+
             self.fatal_error.set()
             self.running_game.clear()
             self.continue_game.clear()
@@ -122,36 +119,32 @@ class Controller(Thread, Logger):
             self.graphic_queue.put((instruction, arg))
         else:
             self.graphic_queue.put((instruction, ))
+
         self.communicate.signal.emit()
 
     def stop_server(self):
 
-        self.log("Stop server.")
-        self.server.shutdown()
+        self.log("Stop server.", level=1)
+        self.server.stop_to_serve()
 
     def start_server(self):
 
         if not self.running_server.is_set():
             self.server.start()
+            self.server_queue.put(("serve", ))
 
-        self.server_queue.put(("Go", ))
+        self.running_server.set()
+        self.log("Server running.", level=1)
 
-    def scan_network_for_new_devices(self):
-
-        self.start_server()
-        self.device_scanning_event.set()
-
-    def add_device_to_map_android_id_server_id(self, server_data):
-
-        android_id = server_data.split("/")[-1]
-        self.id_manager.get_ids_from_android_id(android_id, max_n=1)
-
-        response = "error/adding_new_device"
-        self.server_queue.put(("reply", response))
-        self.stop_server()
-
-        self.device_scanning_event.clear()
-        self.ask_interface("stop_scanning_network")
+    def erase_tables(self):
+        """
+        this method does not use
+        server queue because it needs to be run at
+        shutdown. Otherwise server does not have the time
+        to treat_requests and tables are not erased.
+        """
+        tables = "participants", "waiting_list", "request", "response"
+        self.server.ask_for_erasing_tables(tables=tables)
 
     # ------------------------------- Message handling ----------------------------------------------- #
 
@@ -159,32 +152,34 @@ class Controller(Thread, Logger):
 
         command = message[0]
         args = message[1:]
+        func = getattr(self, command)
+
         if len(args):
-            eval("self.{}(*args)".format(command))
+            func(*args)
         else:
-            eval("self.{}()".format(command))
+            func()
 
     # ------------------------------ Server interface ----------------------------------------#
 
-    def server_running(self):
-
-        self.log("Server running.")
-        self.running_server.set()
-
     def server_error(self, error_message):
 
-        self.log("Server error.")
+        self.log("Server error.", level=3)
         self.ask_interface("server_error", error_message)
 
     def server_request(self, server_data):
-        
+
         # when using device manager to add new clients to json mapping
         if self.device_scanning_event.is_set():
             self.add_device_to_map_android_id_server_id(server_data)
-        
+
         # When game is launched
         elif "ask_init" in server_data:
             response = self.init.ask_init(server_data)
+            self.server_queue.put((response[0], response[1]))
+
+        # init admin
+        elif "ask_admin_init" in server_data:
+            response = self.init.ask_admin_init()
             self.server_queue.put((response[0], response[1]))
 
         else:
@@ -199,23 +194,36 @@ class Controller(Thread, Logger):
         """
         self.data.current_state["time_since_last_request_{}s".format(
             args[0])][args[1]] = str(args[2])
-   
+
+    def server_new_message(self, user_name, message):
+
+        self.log("Got new message from distant server coming from {}: '{}'.".format(user_name, message))
+        self.ask_interface("controller_new_message", (user_name, message))
+
+    def server_update_assignment_frame(self, waiting_list):
+
+        n_player = self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]
+
+        if len(waiting_list) <= n_player:
+            participants = waiting_list
+        else:
+            participants = waiting_list[:n_player]
+
+        self.ask_interface("update_waiting_list_assignment_frame", participants)
+
     # ------------------------------ UI interface  -------------------------------------------#
 
-    def ui_set_server(self, server_class):
-        self.log("Server's class: {}".format(server_class), level=1)
-        self.server = server_class(controller=self)
-        self.server_queue = self.server.queue
-        self.init.set_server_class(server_class)
-        self.ask_interface("set_server_class_parametrization_frame", server_class)
-    
     def ui_set_server_parameters(self, param):
-        self.log("Setting server parameters from interface: {}".format(param), level=1)
+        self.log("Setting server parameters from interface: {}".format(param))
         self.server.setup(param)
+
+        # start server
+        self.start_server()
+
         self.ask_interface("set_server_address_game_frame", self.server.server_address)
 
     def ui_set_assignment(self, assignment):
-        self.log("Setting game assignement from interface: {}".format(assignment), level=1)
+        self.log("Setting game assignement from interface: {}".format(assignment))
         self.data.assignment = assignment
         self.init.set_assignment(assignment)
         self.ask_interface("set_assignment_game_frame", assignment)
@@ -223,18 +231,12 @@ class Controller(Thread, Logger):
     def ui_set_parametrization(self, param):
         self.log("Setting parametrization from interface : {}".format(param), level=1)
         self.data.parametrization = param
-
-    def ui_tcp_run_game(self):
-        self.log("UI ask 'run game'.")
-        self.data.new()
-        self.time_manager.setup()
-        self.launch_game()
-        self.game.new()
+        self.data.condition = param["condition"]
 
     def ui_load_game(self, file):
         self.log("UI ask 'load game'.")
         self.data.load(file)
-        
+
         # set assignment for interface (display game_view) and init
         assignment = self.data.assignment
         self.init.set_assignment(assignment)
@@ -248,13 +250,17 @@ class Controller(Thread, Logger):
         self.log("UI ask 'stop game'.")
         self.stop_game_first_phase()
 
+    def ui_force_to_stop_game(self):
+        self.log("UI asks 'force to stop game'.")
+        self.stop_game_second_phase()
+
     def ui_close_window(self):
         self.log("UI ask 'close window'.")
         self.close_program()
 
     def ui_retry_server(self):
         self.log("UI ask 'retry server'.")
-        self.server_queue.put(("Go",))
+        self.server_queue.put(("game",))
 
     def ui_write_parameters(self, key, value):
         self.log("UI ask 'write parameters'.")
@@ -262,9 +268,14 @@ class Controller(Thread, Logger):
         self.log("Write interface parameters to json files.")
 
     def ui_update_game_view_data(self):
+        """
+        update figures and tables
+        on game view.
+        does it only when game is running
+        """
 
         if self.running_game.is_set():
-            self.log("UI asks 'update data'.", level=1)
+            self.log("UI asks 'update data'.")
             self.ask_interface("update_tables", self.get_current_data())
             self.ask_interface("update_figures", self.get_current_data())
 
@@ -279,59 +290,73 @@ class Controller(Thread, Logger):
     def ui_look_for_alive_players(self):
 
         self.log("UI asks 'look for alive players'.")
-        
+
         if self.game.is_ended():
 
+            # display start frame
             self.ask_interface("show_frame_start")
-            self.stop_server()
+
+            # stop bots
             self.game.stop_bots()
+            self.erase_tables()
 
         else:
 
             self.ask_interface("force_to_quit_game")
 
+    def ui_new_message(self, user_name, message):
+
+        self.log("Got new message from ui for {}: '{}'.".format(user_name, message))
+        self.server.side_queue.put(("send_message", user_name, message))
+
     def ui_php_run_game(self):
 
-        roles = [i[2] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
-        participants = [i[1] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
-        game_ids = [i[0] for i in self.data.assignment if i[3] is False]  # Order is 'name', 'role', 'bot'
+        # ---------- get roles, participants, and game_ids in assignment ------- #
+        roles = [i[2] for i in self.data.assignment if i[3] is False]
+        participants = [i[1] for i in self.data.assignment if i[3] is False]
+        game_ids = [i[0] for i in self.data.assignment if i[3] is False]
+        # --------------------------------------------------- #
 
-        # write participants mapping to json file
+        # ----- write participants mapping to json file ---- #
         mapping = {str(game_id): name for game_id, name, role, bot in self.data.assignment}
-        
+
         self.data.param["map_php"] = mapping
         self.data.write_param("map_php", mapping)
         self.data.write_param("assignment_php", self.data.assignment)
+        # --------------------------------------------------- #
 
-        self.server.authorize_participants(participants=participants, roles=roles, game_ids=game_ids)
+        # --------- Authorize participants to run game ------ #
+        self.server.side_queue.put(("authorize_participants", participants, roles, game_ids))
+        # --------------------------------------------------- #
 
-        self.ask_interface("show_frame_parametrization")
+        self.ask_interface("show_frame_game")
 
+        # ------- Run game -----------------------------------#
         self.log("UI ask 'run game'.")
         self.data.new()
         self.time_manager.setup()
         self.launch_game()
         self.game.new()
+        # --------------------------------------------------- #
 
     def ui_php_scan_button(self):
 
-        n_player = self.data.param["game"]["n_customers"] + self.data.param["game"]["n_firms"]
-        waiting_list = self.server.get_waiting_list()  # Potential conflict with the call in 'push_next_button'
-
-        if len(waiting_list) <= n_player:
-            participants = waiting_list
-        else:
-            participants = waiting_list[:n_player]
-
-        self.ask_interface("update_participants", participants)
+        self.server.side_queue.put(("get_waiting_list", ))
 
     def ui_php_erase_sql_tables(self, tables):
-        
-        if self.server is not None and self.server.server_address is not None:
-            self.server.ask_for_erasing_tables(tables)
+
+        if self.running_server.is_set():
+            self.server.side_queue.put(("erase_sql_tables", tables))
+
         else:
             self.ask_interface("show_warning", "Server is not configured!")
-    
+
+    def ui_php_set_missing_players(self, value):
+
+        if self.server is not None and self.server.server_address is not None:
+
+            self.server.side_queue.put(("set_missing_players", value))
+
     # ------------------------------ Time Manager interface ------------------------------------ #
 
     def time_manager_stop_game(self):
@@ -359,7 +384,7 @@ class Controller(Thread, Logger):
         name = self.id_manager.get_client_name_from_game_id(game_id)
 
         self.init.queue.put(name)
-        
+
     # ---------------------- Parameters management -------------------------------------------- #
 
     def get_current_data(self):

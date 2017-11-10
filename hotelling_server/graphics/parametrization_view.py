@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, \
-    QCheckBox, QLineEdit, QMessageBox, QHBoxLayout, QButtonGroup
+    QCheckBox, QLineEdit, QMessageBox, QHBoxLayout, QButtonGroup, QRadioButton
 from utils.utils import Logger
 
 
@@ -31,12 +31,9 @@ class ParametersFrame(QWidget, Logger):
 
         self.order = ["save",
                       "exploration_cost",
-                      "utility_consumption"]
-        
-        # These two depends on server class choice
-        self.show_frame_assignment = None
-        self.show_frame_game = None
-
+                      "utility_consumption",
+                      "condition"]
+                      
         self.setup()
 
     def setup(self):
@@ -54,6 +51,9 @@ class ParametersFrame(QWidget, Logger):
             IntParameter(text="Utility consumption",
                          initial_value=param["utility_consumption"], value_range=[0, 100])
 
+        self.widgets["condition"] = \
+             RadioParameter(text="Transportation Cost", checked=param["condition"])
+
         self.fill_layout()
 
         # noinspection PyUnresolvedReferences
@@ -61,15 +61,9 @@ class ParametersFrame(QWidget, Logger):
 
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
+
+        self.run_button.setDefault(True)
     
-    def set_next_frame_previous_frame_methods(self, server_name):
-
-        self.show_frame_assignment = (self.parent().show_frame_assignment_tcp, 
-                self.parent().show_frame_assignment_php)[server_name == "PHPServer"]
-
-        self.show_frame_game = (self.parent().tcp_run_game, 
-                self.parent().php_run_game)[server_name == "PHPServer"]
-
     def fill_layout(self):
 
         # prepare layout
@@ -95,14 +89,13 @@ class ParametersFrame(QWidget, Logger):
 
         else:
             self.log("Push 'run' button.")
-
+            
+            # ---- save parametrization ------ # 
             self.param["parametrization"] = self.get_widgets_values()
             self.parent().save_parameters("parametrization", self.param["parametrization"])
             self.parent().set_parametrization(self.param["parametrization"])
 
-            # maybe one of those 2 methods: 
-            # self.parent().tcp_run_game() / self.parent().php_run_game()
-            self.show_frame_game()
+            self.parent().php_run_game()
 
     def push_previous_button(self):
 
@@ -113,9 +106,7 @@ class ParametersFrame(QWidget, Logger):
         else:
             self.log("Push 'previous' button.")
             
-            # maybe one of those 2 methods: 
-            # self.parent().show_frame_assignement_tcp/php()
-            self.show_frame_assignment()
+            self.parent().show_frame_assignment_php()
 
     def get_widgets_values(self):
 
@@ -207,3 +198,48 @@ class CheckParameter(object):
 
         layout.addWidget(self.label, x, y, alignment=Qt.AlignCenter)
         layout.addWidget(self.check_box, x, y + 1, alignment=Qt.AlignLeft)
+
+
+class RadioParameter:
+
+    def __init__(self, text, checked):
+
+        self.text = QLabel(text)
+        
+        self.layout = QHBoxLayout()
+
+        self.group = QButtonGroup()
+        self.high = QRadioButton()
+        self.low = QRadioButton()
+
+        if "low" in checked:
+            self.low.setChecked(True)
+        else:
+            self.high.setChecked(True)
+
+        self.label = {0: QLabel("low"), 1: QLabel("high")}
+
+        self.setup()
+
+    def setup(self):
+
+        self.layout.addWidget(self.label[0])
+        self.layout.addWidget(self.low)
+
+        self.layout.addWidget(self.label[1])
+        self.layout.addWidget(self.high)
+
+        self.group.addButton(self.high)
+        self.group.addButton(self.low)
+
+    def get_value(self):
+
+        return ("low_t_cost", "high_t_cost")[self.high.isChecked()]
+
+    def add_to_grid_layout(self, layout, x, y):
+
+        layout.addWidget(self.text, x, y, alignment=Qt.AlignLeft)
+        layout.addLayout(self.layout, x, y + 1, alignment=Qt.AlignCenter)
+
+
+

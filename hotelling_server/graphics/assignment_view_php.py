@@ -1,8 +1,13 @@
 from PyQt5.QtCore import Qt, QObject, QEvent
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, \
-    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, QMessageBox, QFormLayout, QDialog
+    QGridLayout, QButtonGroup, QHBoxLayout, QLineEdit, QCheckBox, QRadioButton, \
+    QScrollArea, QMessageBox, QGroupBox
+
+from threading import Thread, Event
+import numpy as np
 
 from utils.utils import Logger
+
 
 
 class AssignmentFramePHP(Logger, QWidget):
@@ -12,22 +17,30 @@ class AssignmentFramePHP(Logger, QWidget):
 
         # noinspection PyArgumentList
         super().__init__(parent=parent)
-        
+
         self.param = param
 
         self.layout = QVBoxLayout()
 
-        self.next_button = QPushButton("Next")
+        self.next_button = QPushButton("Run!")
         self.previous_button = QPushButton("Previous")
-        self.scan_button = QPushButton("Look for new participants...")
 
         self.group = QButtonGroup()
 
         self.group.addButton(self.previous_button)
         self.group.addButton(self.next_button)
-        self.group.addButton(self.scan_button)
+
+        # assignments widgets (list of game id, server id, role, bot)
+        self.list_group = QGroupBox("Set assignments")
+        self.list_widget = QWidget()
+        self.list_scroll_area = QScrollArea()
 
         self.parameters = dict()
+
+        # those attributs will be set in prepare method
+        self.missing_players = None
+        self.timer = None
+        self.autostart = None
 
         self.error = None
 
@@ -47,25 +60,29 @@ class AssignmentFramePHP(Logger, QWidget):
         labels = ("Game id", "Name", "Firm " + " Customer", "Bot")
 
         # noinspection PyUnusedLocal
-        self.parameters["assign"] = [[] for i in range(n_agents)]
+        self.parameters["assign"] = [{} for i in range(n_agents)]
 
         self.new_setup(n_agents=n_agents, roles=roles)
-        
+
         # --------- fill layout ----------------------------------- #
 
         self.fill_layout(labels, n_agents)
+
+        self.list_scroll_area.setFixedHeight(500)
+        self.list_scroll_area.setFixedWidth(500)
 
         # noinspection PyUnresolvedReferences
         self.next_button.clicked.connect(self.push_next_button)
         # noinspection PyUnresolvedReferences
         self.previous_button.clicked.connect(self.push_previous_button)
-        # noinspection PyUnresolvedReferences
-        self.scan_button.clicked.connect(self.push_scan_button)
+
+        self.next_button.setAutoDefault(True)
+        self.next_button.setDefault(True)
 
         self.setup_done = True
 
     def fill_layout(self, labels, n_agents):
-        
+
         # prepare layout
         grid_layout = QGridLayout()
 
@@ -73,11 +90,13 @@ class AssignmentFramePHP(Logger, QWidget):
         for y, label in enumerate(labels):
             grid_layout.addWidget(QLabel(label), 0, y)
 
+        keys = ("game_id", "server_id", "role", "bot")
+
         # grid layout coordinates
-        coordinates = [(x, y) for x in range(1, n_agents + 1) for y in range(len(labels))]
+        coordinates = [(x, y) for x in range(1, n_agents + 1) for y in range(len(keys))]
 
         # parameters index
-        index = [(i, j) for i in range(n_agents) for j in range(len(labels))]
+        index = [(i, j) for i in range(n_agents) for j in keys]
 
         for (i, j), (x, y) in zip(index, coordinates):
             self.parameters["assign"][i][j].add_to_grid_layout(grid_layout, x, y)
@@ -85,30 +104,48 @@ class AssignmentFramePHP(Logger, QWidget):
         horizontal_layout = QHBoxLayout()
         horizontal_layout.addWidget(self.previous_button, alignment=Qt.AlignCenter)
         horizontal_layout.addWidget(self.next_button, alignment=Qt.AlignCenter)
-        
-        self.layout.addLayout(grid_layout)
+
+        self.list_widget.setLayout(grid_layout)
+        self.list_scroll_area.setWidget(self.list_widget)
+
+        list_scroll_area_layout = QHBoxLayout()
+        list_scroll_area_layout.addWidget(self.list_scroll_area)
+
+        self.list_group.setLayout(list_scroll_area_layout)
+
+        self.layout.addWidget(self.list_group, alignment=Qt.AlignCenter)
         self.layout.addLayout(horizontal_layout)
-        
-        self.layout.addWidget(self.scan_button, alignment=Qt.AlignCenter)
 
         self.setLayout(self.layout)
 
-    def prepare(self):
-        
+    def prepare(self, param):
+
+        # get params from interface
+        self.missing_players = param["network"]["missing_players"]
+        self.autostart = param["network"]["autostart"]
+
         self.next_button.setEnabled(True)
         self.next_button.setFocus()
         self.setFocus()
 
+        # update waiting list view
+        self.timer = Timer(self, self.ask_for_updating_waiting_list, 1000)
+        self.timer.start()
+
     def new_setup(self, n_agents, roles):
 
         for i in range(n_agents):
-            self.parameters["assign"][i].append(IntParameter(parent=self, value=i, idx=i, greyed=False, event=False))
-            
-            self.parameters["assign"][i].append(IntParameter(parent=self, value="Bot", idx=i, greyed=True, event=True))
+            self.parameters["assign"][i]["game_id"] = IntParameter(parent=self,
+                value=i, idx=i)
 
-            self.parameters["assign"][i].append(RadioParameter(checked=roles[i]))
+            self.parameters["assign"][i]["server_id"] = IntParameter(parent=self,
+                value="Bot", idx=i)
 
-            self.parameters["assign"][i].append(CheckParameter(parent=self, checked=True, idx=i))
+            self.parameters["assign"][i]["role"] = RadioParameter(parent=self,
+                checked=roles[i], idx=i)
+
+            self.parameters["assign"][i]["bot"] = CheckParameter(parent=self,
+                checked=True, idx=i)
 
     # ---------------------- PUSH BUTTONS --------------------------------- #
 
@@ -121,11 +158,19 @@ class AssignmentFramePHP(Logger, QWidget):
 
         else:
             self.log("Push 'next' button.")
-                  
+
+            # get assignment
             self.param["assignment_php"] = self.get_parameters()
             self.parent().save_parameters("assignment_php", self.param["assignment_php"])
+
+            # set assignment and wait for controller to show game view
             self.parent().set_assignment(assignment=self.param["assignment_php"])
-            self.parent().show_frame_parametrization()
+
+            # run game 
+            self.parent().php_run_game()
+            
+            # stop refreshing waiting list
+            self.timer.stop()
 
     def push_previous_button(self):
 
@@ -135,29 +180,36 @@ class AssignmentFramePHP(Logger, QWidget):
 
         else:
             self.log("Push 'previous' button.")
-            self.parent().show_frame_load_game_new_game_php()
+            self.parent().show_frame_start()
 
-    def push_scan_button(self):
+    # ------------------------------------------------------------------------------- #
 
-        self.scan_button.setEnabled(False)
-
+    def ask_for_updating_waiting_list(self):
         self.parent().php_scan_button()
 
-    # ------------------------------------------------------------------------------- #
+    def update_waiting_list(self, participants):
 
-    def update_participants(self, participants):
+        if participants:
 
-        for i, name in enumerate(participants):
-            line_edit = self.parameters["assign"][i][1].edit  # line edit widget (server id)
-            check_box = self.parameters["assign"][i][3].check_box  # check box widget (bot or not)
+            for i, name in enumerate(participants):
+                line_edit = self.parameters["assign"][i]["server_id"].edit  # line edit widget (server id)
+                check_box = self.parameters["assign"][i]["bot"].check_box  # check box widget (bot or not)
 
-            self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
+                self.enable_line_edit(line_edit=line_edit, check_box=check_box, name=name)
 
-        self.scan_button.setEnabled(True)
+            # if autostart is set run the game
+            if len(participants) == self.missing_players and self.autostart:
+                self.push_next_button()
 
-    # ------------------------------------------------------------------------------- #
+        else:
 
-    def check_assignment_validity(self):
+            # if not participants reset server_id widget
+            for line in self.parameters["assign"]:
+                self.disable_line_edit(line["server_id"].edit)
+
+    # ----------------------------- assignment validity checking -------------------------------------------------- #
+
+    def check_assignment_validity(self, **kwargs):
 
         assignment = list(enumerate(self.get_parameters()))
         n_firm = 0
@@ -175,12 +227,35 @@ class AssignmentFramePHP(Logger, QWidget):
                     return "Two identical game_id ids: '{}'.".format(game_id)
 
         # if role config is not respected
-        if n_firm != 2:
-            return "Wrong number of firm: '{}'".format(n_firm)
-                
+        if n_firm != self.param["game"]["n_firms"]:
+            self.remove_or_add_firms(n_firm=n_firm, assignment=assignment, idx=kwargs["idx"])
+
+    def remove_or_add_firms(self, n_firm, assignment, idx):
+
+        nb_of_firm_to_add_or_remove = self.param["game"]["n_firms"] - n_firm
+
+        for i, (game_id, server_id, role, bot) in assignment:
+
+            if i != idx:
+
+                if nb_of_firm_to_add_or_remove < 0:
+
+                    if role == "firm":
+                        self.parameters["assign"][i]["role"].customer.setChecked(True)
+                        nb_of_firm_to_add_or_remove += 1
+
+                elif  nb_of_firm_to_add_or_remove > 0:
+
+                    if role == "customer":
+                        self.parameters["assign"][i]["role"].firm.setChecked(True)
+                        nb_of_firm_to_add_or_remove -= 1
+
+    # ----------------------------------------------------------------------------------------------------------------- #
+
     def get_parameters(self):
-        return [[int(i.get_value()), j.get_value(), k.get_value(), l.get_value()] for i, j, k, l in self.parameters["assign"]]
-    
+        return [[int(i["game_id"].get_value()), i["server_id"].get_value(), i["role"].get_value(), i["bot"].get_value()]
+                for i in self.parameters["assign"]]
+
     def show_warning(self, **instructions):
 
         QMessageBox().warning(
@@ -193,40 +268,34 @@ class AssignmentFramePHP(Logger, QWidget):
         if self.setup_done:
 
             # get desired widgets
-            line_edit = self.parameters["assign"][idx][1].edit  # line edit widget (server_id)
-            check_box = self.parameters["assign"][idx][3].check_box  # check box widget (bot or not)
+            line_edit = self.parameters["assign"][idx]["server_id"].edit  # line edit widget (server_id)
+            check_box = self.parameters["assign"][idx]["bot"].check_box  # check box widget (bot or not)
 
             # if line edit (containing server ids) is not enabled
-            if not line_edit.isEnabled():
+            if not line_edit.isEnabled() and from_line :
                 self.enable_line_edit(line_edit, check_box)
 
             # if line edit is enabled and signal comes from check box
-            elif line_edit.isEnabled() and not from_line:
+            elif not line_edit.isEnabled() and not from_line:
                 self.disable_line_edit(line_edit)
 
     @staticmethod
     def disable_line_edit(line_edit):
 
         line_edit.setText("Bot")
-        line_edit.setEnabled(False)
-        line_edit.setStyleSheet(line_edit.greyed_style)
 
     @staticmethod
     def enable_line_edit(line_edit, check_box, name=""):
 
         check_box.setChecked(False)
-        line_edit.setEnabled(True)
         line_edit.setText(name)
-        line_edit.setStyleSheet("")
-        line_edit.setFocus(True)
 
     # --------------------------------- Widgets used in assignment menu --------------------------------- #
-
 
 class RadioParameter(object):
     """role (firm/customer)"""
 
-    def __init__(self, checked):
+    def __init__(self, parent, checked, idx):
 
         self.layout = QHBoxLayout()
 
@@ -234,6 +303,8 @@ class RadioParameter(object):
 
         self.firm = QRadioButton()
         self.customer = QRadioButton()
+
+        self.filter = MouseClick(parent=parent, idx=idx)
 
         self.setup(checked)
 
@@ -250,6 +321,9 @@ class RadioParameter(object):
         self.layout.addWidget(self.firm)
         self.layout.addWidget(self.customer)
 
+        self.firm.installEventFilter(self.filter)
+        self.customer.installEventFilter(self.filter)
+
     def get_value(self):
 
         return ("customer", "firm")[self.firm.isChecked()]
@@ -262,28 +336,16 @@ class RadioParameter(object):
 class IntParameter(object):
     """game_id and server_id"""
 
-    def __init__(self, parent, value, idx, greyed, event):
+    def __init__(self, parent, value, idx):
 
         self.idx = idx
         self.edit = QLineEdit(str(value))
-        self.edit.greyed_style = '''color: #808080;
-                              background-color: #F0F0F0;
-                              border: 1px solid #B0B0B0;
-                              border-radius: 2px;'''
 
-        self.filter = MouseClick(parent=parent, idx=idx)
-        self.setup(greyed, event)
+        self.setup()
 
-    def setup(self, greyed, event):
-        
-        if greyed:
-            self.edit.setEnabled(False)
-            self.edit.setStyleSheet(self.edit.greyed_style)
-        else:
-            self.edit.setEnabled(True)
+    def setup(self):
 
-        if event:
-            self.edit.installEventFilter(self.filter)
+        self.edit.setEnabled(False)
 
     def get_value(self):
 
@@ -319,7 +381,8 @@ class CheckParameter(object):
 
 class MouseClick(QObject):
     """class used in order
-    to detect if QLineEdit widget
+    to detect if QLineEdit/QRadioButton
+    (respectively roles and server_id widget)
     has been clicked"""
 
     def __init__(self, parent, idx):
@@ -328,8 +391,49 @@ class MouseClick(QObject):
         self.parent = parent
 
     def eventFilter(self, obj, event):
+
         if event.type() == QEvent.MouseButtonPress:
-            self.parent.switch_line_edit(idx=self.idx, from_line=True)
-            return True
+
+            if type(obj) == QRadioButton:
+
+                widget = self.parent.parameters["assign"][self.idx]["role"]
+
+                if widget.firm.isChecked():
+                    widget.customer.setChecked(True)
+                else:
+                    widget.firm.setChecked(True)
+
+                self.parent.check_assignment_validity(idx=self.idx)
+                return True
+
+            else:
+                self.parent.switch_line_edit(idx=self.idx, from_line=True)
+                return True
 
         return False
+
+
+class Timer(Thread):
+    def __init__(self, parent, func, interval):
+        super().__init__()
+        self.interval = interval
+        self.func = func
+        self._parent = parent
+
+    def stop(self):
+        self._is_stopped = True
+
+    def stopped(self):
+        return self._is_stopped
+
+    def parent(self):
+        return self._parent
+
+    def run(self):
+        while not self.stopped():
+
+            try:
+                self.func()
+                Event().wait(np.random.randint(3))
+            except:
+                Event().wait(np.random.randint(3))
