@@ -2,6 +2,9 @@ from multiprocessing import Queue
 import numpy as np
 
 
+from copy import deepcopy
+
+
 class Init:
 
     name = "Init"
@@ -71,9 +74,9 @@ class Init:
         self.data.roles[game_id] = role
 
         if role == "firm":
-            return self.init_firms_php("ask_init", game_id, role)
+            return self.init_firms_php("ask_init", game_id)
         else:
-            return self.init_customers_php("ask_init", game_id, role)
+            return self.init_customers_php("ask_init", game_id)
 
     def init_customers_tcp(self, func_name, game_id, role):
 
@@ -92,7 +95,7 @@ class Init:
             game_id, func_name, self.time_manager.t, role, position, exploration_cost,
             utility_consumption, utility)
 
-    def init_customers_php(self, func_name, game_id, role):
+    def init_customers_php(self, func_name, game_id):
 
         if game_id not in self.data.customers_id.keys():
             customer_id = len(self.data.customers_id)
@@ -118,7 +121,7 @@ class Init:
 
         return position, exploration_cost, utility_consumption, utility
 
-    def init_firms_tcp(self, func_name, game_id, role):
+    def init_firms_tcp(self, func_name, game_id):
 
         if game_id not in self.data.firms_id.keys():
             firm_id = len(self.data.firms_id)
@@ -128,14 +131,15 @@ class Init:
         else:
             firm_id = self.data.firms_id[game_id]
 
-        state, position, price, opp_position, opp_price, profits = self.get_firms_data(firm_id)
+        t, state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
-        return self.reply(game_id, func_name, self.time_manager.t,
+        return self.reply(
+            game_id, func_name, t,
             position, state, price, opp_position, opp_price, profits)
 
-    def init_firms_php(self, func_name, game_id, role):
+    def init_firms_php(self, func_name, game_id):
 
         if game_id not in self.data.firms_id.keys():
             firm_id = len(self.data.firms_id)
@@ -145,36 +149,53 @@ class Init:
         else:
             firm_id = self.data.firms_id[game_id]
 
-        state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
+        t, state, position, price, opp_position, opp_price, profits, opp_profits = self.get_firms_data(firm_id)
 
         self.check_remaining_agents()
 
-        return self.reply(game_id,
-                func_name,
-                self.time_manager.t,
-                position,
-                state,
-                price,
-                opp_position,
-                opp_price,
-                profits,
-                opp_profits)
+        return self.reply(
+            game_id,
+            func_name,
+            t,
+            position,
+            state,
+            price,
+            opp_position,
+            opp_price,
+            profits,
+            opp_profits)
 
     def get_firms_data(self, firm_id):
 
         opponent_id = (firm_id + 1) % 2
 
-        state = self.data.current_state["firm_status"][firm_id]
+        t = self.time_manager.t
+        cs = deepcopy(self.data.current_state)
 
-        position = self.data.current_state["firm_positions"][firm_id]
-        price = self.data.current_state["firm_prices"][firm_id]
-        profits = self.data.current_state["firm_cumulative_profits"][firm_id]
+        position = cs["firm_positions"][firm_id]
+        price = cs["firm_prices"][firm_id]
+        profits = cs["firm_cumulative_profits"][firm_id]
 
-        opp_position = self.data.current_state["firm_positions"][opponent_id]
-        opp_price = self.data.current_state["firm_prices"][opponent_id]
-        opp_profits = self.data.current_state["firm_cumulative_profits"][opponent_id]
+        opp_position = cs["firm_positions"][opponent_id]
+        opp_price = cs["firm_prices"][opponent_id]
+        opp_profits = cs["firm_cumulative_profits"][opponent_id]
 
-        return (state,
+        state = cs["firm_status"][firm_id]
+
+        if (state == "passive" and cs["active_gets_results"] is True) or \
+                (state == "active" and cs["passive_gets_results"] is True):
+            firm_choices = np.asarray(cs["customer_firm_choices"])
+            n_opp = sum(firm_choices == opponent_id)
+            opp_profits -= n_opp * opp_price
+
+        if (state == "active" and cs["active_gets_results"] is True) or \
+                (state == "passive" and cs["passive_gets_results"] is True):
+            firm_choices = np.asarray(cs["customer_firm_choices"])
+            n = sum(firm_choices == firm_id)
+            profits -= n * price
+
+        return (t,
+                state,
                 position,
                 price,
                 opp_position,

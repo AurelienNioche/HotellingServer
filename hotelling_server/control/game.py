@@ -101,8 +101,9 @@ class Game(Logger):
 
         if n_firms > 0 or n_customers > 0:
             self.bots = \
-                HotellingLocalBots(self.controller, n_firms, n_customers, n_agents_to_wait,
-                self.interface_parameters["condition"])
+                HotellingLocalBots(
+                    self.controller, n_firms, n_customers, n_agents_to_wait,
+                    self.interface_parameters["condition"])
             self.bots.start()
 
     def stop_bots(self):

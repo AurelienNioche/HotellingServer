@@ -11,7 +11,7 @@ class EraseSQLTablesFrame(QWidget):
 
         super().__init__()
 
-        self.parent = parent 
+        self.parent = parent
 
         self.setWindowTitle("Erase sql tables")
 
@@ -35,7 +35,7 @@ class EraseSQLTablesFrame(QWidget):
         self.cancel_button.clicked.connect(self.push_cancel_button)
 
     def fill_layout(self):
-        
+
         form_layout = QFormLayout()
 
         for label in self.tables:
@@ -73,10 +73,8 @@ class EraseSQLTablesFrame(QWidget):
 
         checked_tables = [k for k, v in self.tables_check_boxes.items() if v.isChecked()]
 
-        if len(checked_tables):
+        if checked_tables:
             self.parent.php_erase_sql_tables(checked_tables)
 
         self.hide()
         self.ok_button.setEnabled(True)
-
-

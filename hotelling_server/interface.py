@@ -100,6 +100,7 @@ class UI(QWidget, Logger, MessageBox):
         self.frames["devices"].show_device_added()
 
     def update_waiting_list_assignment_frame(self, participants):
+
         self.frames["assign_php"].update_waiting_list(participants)
 
     def controller_new_message(self, args):
@@ -112,8 +113,8 @@ class UI(QWidget, Logger, MessageBox):
 
     # ----------------- called by views methods -------------------------------------------------------- # 
     def save_parameters(self, key, data):
-        self.param[key] = data
 
+        self.param[key] = data
     # -------------------------------------------------------------------------------------------------- # 
 
     def _get_parameters(self, *keys):
@@ -126,14 +127,14 @@ class UI(QWidget, Logger, MessageBox):
         self.send_go_signal()
         self.communicate.signal.connect(self.look_for_msg)
 
-        # self.check_update()
-
-        # get saved geometry
+        # get saved geometry or set regular geometry
         try: 
             self.restoreGeometry(self.settings.value("geometry"))
 
         except Exception as e:
             self.log(str(e), level=3) 
+            self.log("Setting regular dimensions", level=1)
+            self.setGeometry(*self.dimensions)
 
     def prepare_frames(self): 
 
@@ -195,8 +196,6 @@ class UI(QWidget, Logger, MessageBox):
 
         self.setWindowTitle(self.app_name)
 
-        self.setGeometry(*self.dimensions)
-
         grid = QGridLayout()
 
         for frame in self.frames.values():
@@ -207,7 +206,6 @@ class UI(QWidget, Logger, MessageBox):
         grid.setAlignment(Qt.AlignCenter)
 
         self.layout.addLayout(grid, stretch=1)
-
         self.setLayout(self.layout)
 
     def closeEvent(self, event):
@@ -241,8 +239,8 @@ class UI(QWidget, Logger, MessageBox):
 
     def close_menubar_windows(self):
 
-        for win in self.menubar_frames.values():
-            win.close()
+        for window in self.menubar_frames.values():
+            window.close()
 
     def save_geometry(self):
 
