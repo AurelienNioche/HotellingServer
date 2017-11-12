@@ -11,13 +11,13 @@ class Data(Logger):
         # --- game variables --- #
 
         self.entries = [
-            "firm_positions", "firm_prices", "firm_profits", 
+            "firm_positions", "firm_prices", "firm_profits",
             "firm_cumulative_profits", "customer_firm_choices",
-            "customer_extra_view_choices", "customer_utility", 
+            "customer_extra_view_choices", "customer_utility",
             "n_client", "customer_replies", "active_replied",
-            "passive_gets_results", "active_gets_results", 
+            "passive_gets_results", "active_gets_results",
             "firm_status", "time_since_last_request_firms",
-            "time_since_last_request_customers", "init_done", 
+            "time_since_last_request_customers", "init_done",
             "firm_states", "customer_states"
         ]
 
@@ -44,25 +44,26 @@ class Data(Logger):
         self.n_agents = None
 
         self.assignment = {}
-
-        self.condition = None
-
         self.parametrization = {}
         self.roles = []
 
         # --- server parameters --- #
 
-        self.keys = [
-            "network", "game", "folders", "map_android_id_server_id",
-            "parametrization", "assignment_tcp", "assignment_php", "map_php", "sql_tables"]
+        self.keys = ["network", "game", "folders", "parametrization", "assignment_php", "sql_tables"]
 
         self.param = {}
 
         self.setup()
 
+    def set_assignment(self, assignment):
+        self.assignment = assignment
+
+    def set_parametrization(self, parametrization):
+        self.parametrization = parametrization
+
     def new(self):
         """when a new game is launched"""
-        
+
         self.current_state = {s: [] for s in self.entries}
 
         self.firms_id = {}  # key: game_id, value: firm_id
@@ -70,7 +71,7 @@ class Data(Logger):
 
         self.bot_firms_id = {}
         self.bot_customers_id = {}
-        
+
         self.map_server_id_android_id = {}
         self.map_server_id_game_id = {}
 
@@ -90,7 +91,7 @@ class Data(Logger):
                 self.param[key] = json.load(file)
 
     def write_param(self, key, new_value):
-        
+
         self.controller.backup.write_param(key, new_value)
 
     def save(self):
@@ -112,8 +113,7 @@ class Data(Logger):
                 "continue": self.controller.time_manager.continue_game,
                 "time_manager_state": self.controller.time_manager.state,
                 "assignment": self.assignment,
-                "parametrization": self.parametrization,
-                "condition": self.condition
+                "parametrization": self.parametrization
             }
         )
 
@@ -140,10 +140,8 @@ class Data(Logger):
         self.continue_game = data["continue"]
         self.assignment = data["assignment"]
         self.parametrization = data["parametrization"]
-        self.condition = data["condition"]
 
     def update_history(self):
 
         for s in self.entries:
             self.history[s].append(self.current_state[s])
-

@@ -8,7 +8,7 @@ class TableLayout(QWidget):
     name = "TableLayout"
 
     def __init__(self, parent, role, labels):
-        
+
         super().__init__()
 
         self.setParent(parent)
@@ -23,7 +23,7 @@ class TableLayout(QWidget):
         self.setLayout(self.layout)
 
     def prepare(self, rows):
-        
+
         columns = self.columns["fancy_labels"]
 
         # empty tables

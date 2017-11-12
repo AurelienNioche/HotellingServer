@@ -10,9 +10,9 @@ class MissingPlayersFrame(QWidget):
     name = "MissingPlayersFrame"
 
     def __init__(self, parent, param):
-        
+
         super().__init__()
-        
+
         self._parent = parent
         self.setWindowTitle("Set missing players variable manually")
         self.param = param
@@ -27,7 +27,7 @@ class MissingPlayersFrame(QWidget):
         return self._parent
 
     def setup(self):
-    
+
         self.fill_layout()
 
         self.missing_player_value.setText(
@@ -43,7 +43,7 @@ class MissingPlayersFrame(QWidget):
         vertical_layout = QVBoxLayout()
 
         form_layout = QFormLayout()
-        
+
         form_layout.addRow(QLabel("missing players"), self.missing_player_value)
 
         vertical_layout.addLayout(form_layout)
@@ -53,11 +53,6 @@ class MissingPlayersFrame(QWidget):
         self.setLayout(vertical_layout)
 
     def push_update_button(self):
-        
+
         self.parent().set_missing_players(self.missing_player_value.text())
         self.hide()
-
-
-
-
-

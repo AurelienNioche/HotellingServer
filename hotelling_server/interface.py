@@ -4,11 +4,12 @@ from multiprocessing import Queue, Event
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt, QSettings
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QDesktopWidget, QFileDialog
 
-from .graphics import game_view, start_view, parametrization_view, \
+from utils.utils import Logger
+
+from .graphics import game_view, start_view, \
         setting_up_view, assignment_view_php, menubar, config_files_view, \
         erase_sql_tables_view, messenger, missing_players_view
 
-from utils.utils import Logger
 from .message_box import MessageBox
 
 
@@ -57,6 +58,7 @@ class UI(QWidget, Logger, MessageBox):
 
         self.menubar = menubar.MenuBar(parent=self)
 
+    # ------------------------ Default dimensions -------------------------------------------------- #
     @property
     def dimensions(self):
 
@@ -131,10 +133,6 @@ class UI(QWidget, Logger, MessageBox):
         self.frames["assign_php"] = \
             assignment_view_php.AssignmentFramePHP(parent=self,
                 param=self._get_parameters("game", "assignment_php", "sql_tables"))
-
-        self.frames["parametrization"] = \
-            parametrization_view.ParametersFrame(parent=self,
-                param=self._get_parameters("parametrization"))
 
         self.frames["game"] = \
             game_view.GameFrame(parent=self,

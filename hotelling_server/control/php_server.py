@@ -1,15 +1,15 @@
 import json
-from multiprocessing import Queue, Event
+from multiprocessing import Queue
 from threading import Thread, Event
 import requests as rq
 
 from utils.utils import Logger
 
 
-class RequestManager:
+class RequestManager(Logger):
 
     name = "RequestManager"
-    request_frequency = 0.1
+    request_frequency = 0.2
 
     def send_request(self, **kwargs):
 
@@ -18,7 +18,7 @@ class RequestManager:
                 return rq.get(self.server_address, params=kwargs)
 
             except Exception as e:
-                Logger.log("I got a connection error. Try again.\n" + str(e), level=3)
+                self.log("I got a connection error. Try again.\n" + str(e), level=3)
                 Event().wait(self.request_frequency)
 
     def send_request_messenger(self, **kwargs):
@@ -28,11 +28,11 @@ class RequestManager:
                 return rq.post(self.server_address_messenger, data=kwargs)
 
             except Exception as e:
-                Logger.log("I got a connection error. Try again.\n" + str(e), level=3)
+                self.log("I got a connection error. Try again.\n" + str(e), level=3)
                 Event().wait(self.request_frequency)
 
 
-class PHPServer(Thread, RequestManager, Logger):
+class PHPServer(Thread, RequestManager):
 
     name = "PHPServer"
     request_frequency = 0.1
@@ -352,7 +352,7 @@ class PHPServer(Thread, RequestManager, Logger):
         while True:
 
             self.log("I will ask the distant server to fill the 'participants' table with {}".format(participants),
-                    level=1)
+                level=1)
 
             response = self.send_request(
                 demand_type="writing",

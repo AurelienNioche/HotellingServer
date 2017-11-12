@@ -3,7 +3,7 @@ from threading import Thread
 
 from utils.utils import Logger
 from hotelling_server.control import backup, data, game, statistician, \
-        id_manager, time_manager, initialization, php_server
+    time_manager, initialization, php_server
 
 
 class Controller(Thread, Logger):
@@ -29,7 +29,6 @@ class Controller(Thread, Logger):
 
         self.data = data.Data(controller=self)
         self.time_manager = time_manager.TimeManager(controller=self)
-        self.id_manager = id_manager.IDManager(controller=self)
         self.backup = backup.Backup(controller=self)
         self.statistician = statistician.Statistician(controller=self)
         self.game = game.Game(controller=self)
@@ -95,7 +94,6 @@ class Controller(Thread, Logger):
     def close_program(self):
 
         self.log("Close program.", level=1)
-        #self.running_game.set()
 
         self.server_queue.put(("Abort",))
         self.stop_server()
@@ -154,7 +152,7 @@ class Controller(Thread, Logger):
         args = message[1:]
         func = getattr(self, command)
 
-        if len(args):
+        if args:
             func(*args)
         else:
             func()
@@ -168,12 +166,8 @@ class Controller(Thread, Logger):
 
     def server_request(self, server_data):
 
-        # when using device manager to add new clients to json mapping
-        if self.device_scanning_event.is_set():
-            self.add_device_to_map_android_id_server_id(server_data)
-
         # When game is launched
-        elif "ask_init" in server_data:
+        if "ask_init" in server_data:
             response = self.init.ask_init(server_data)
             self.server_queue.put((response[0], response[1]))
 
@@ -224,13 +218,14 @@ class Controller(Thread, Logger):
 
     def ui_set_assignment(self, assignment):
         self.log("Setting game assignement from interface: {}".format(assignment))
-        self.data.assignment = assignment
+        self.data.set_assignment(assignment)
         self.init.set_assignment(assignment)
+        self.data.write_param("assignment_php", self.data.assignment)
         self.ask_interface("set_assignment_game_frame", assignment)
 
     def ui_set_parametrization(self, param):
         self.log("Setting parametrization from interface : {}".format(param), level=1)
-        self.data.parametrization = param
+        self.data.set_parametrization(param)
         self.data.condition = param["condition"]
 
     def ui_load_game(self, file):
@@ -239,6 +234,7 @@ class Controller(Thread, Logger):
 
         # set assignment for interface (display game_view) and init
         assignment = self.data.assignment
+        self.data.set_assignment(assignment)
         self.init.set_assignment(assignment)
         self.ask_interface("set_assignment_game_frame", assignment)
 
@@ -311,18 +307,12 @@ class Controller(Thread, Logger):
 
     def ui_php_run_game(self):
 
+        assignment = sorted(self.data.assignment.items())
+
         # ---------- get roles, participants, and game_ids in assignment ------- #
-        roles = [i[2] for i in self.data.assignment if i[3] is False]
-        participants = [i[1] for i in self.data.assignment if i[3] is False]
-        game_ids = [i[0] for i in self.data.assignment if i[3] is False]
-        # --------------------------------------------------- #
-
-        # ----- write participants mapping to json file ---- #
-        mapping = {str(game_id): name for game_id, name, role, bot in self.data.assignment}
-
-        self.data.param["map_php"] = mapping
-        self.data.write_param("map_php", mapping)
-        self.data.write_param("assignment_php", self.data.assignment)
+        roles = [player["role"] for i, player in assignment if player["bot"] is False]
+        participants = [player["name"] for i, player in assignment if player["bot"] is False]
+        game_ids = [i for i, player in assignment if player["bot"] is False]
         # --------------------------------------------------- #
 
         # --------- Authorize participants to run game ------ #
@@ -372,18 +362,6 @@ class Controller(Thread, Logger):
         self.statistician.compute_mean_extra_view_choices()
         self.statistician.compute_profits()
         self.statistician.compute_mean_utility()
-
-    # ------------------------------ Initialization interface ------------------------------------ #
-
-    def init_get_ids_from_client_name_tcp(self, server_id, game_id):
-
-        self.init.queue.put(*(server_id, game_id))
-
-    def init_get_client_name_from_game_id_php(self, game_id):
-
-        name = self.id_manager.get_client_name_from_game_id(game_id)
-
-        self.init.queue.put(name)
 
     # ---------------------- Parameters management -------------------------------------------- #
 

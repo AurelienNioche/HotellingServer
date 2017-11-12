@@ -18,11 +18,12 @@ def get_local_ip():
 
 class Logger:
 
+    name = "Logger"
     debug = 0
 
     @classmethod
     def log(cls, msg, level=0):
-        
+
         stamp = "{} {}: {}".format(datetime.now().strftime("[%y/%m/%d %H:%M:%S:%f]"), cls.name, msg)
 
         # Colour codes for different error levels

@@ -13,7 +13,6 @@ class Init:
 
         self.controller = controller
         self.data = controller.data
-        self.id_manager = controller.id_manager
         self.time_manager = controller.time_manager
 
         self.assignment = None
@@ -27,9 +26,7 @@ class Init:
 
         game_id = int(data.split("/")[1])
 
-        client_name = self.id_manager.get_client_name_from_game_id(game_id)
-
-        role = self.get_role(client_name)
+        role = self.get_role(game_id)
 
         self.data.roles[game_id] = role
 
@@ -138,20 +135,9 @@ class Init:
             ))}
         return "reply", msg
 
-    def get_role(self, server_id):
+    def get_role(self, game_id):
 
-        for game_id, name, role, bot in self.assignment:
-            if name == str(server_id):
-                return role
-
-        # in case of no matching id
-        if server_id not in self.data.unexpected_id_list:
-            self.unexpected_client_id(server_id)
-
-    def unexpected_client_id(self, server_id):
-
-        self.controller.ask_interface("unexpected_client_id", server_id)
-        self.data.unexpected_id_list.append(server_id)
+        return self.assignment[game_id]["role"]
 
     def check_remaining_agents(self):
 

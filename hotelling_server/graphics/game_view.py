@@ -1,7 +1,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QPushButton, QTableWidget, QTableWidgetItem, \
-    QHeaderView, QVBoxLayout, QLabel
+from PyQt5.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel
 import numpy as np
 
 from hotelling_server.graphics.widgets.plot_layouts import PlotLayout
@@ -32,6 +31,7 @@ class GameFrame(QWidget, Logger):
         self.trial_counter = TrialCounter()
 
         self.address_label = QLabel()
+        self.address_text = None
 
         self.plot_layout = dict()
         self.table_layout = dict()
@@ -180,7 +180,7 @@ class GameFrame(QWidget, Logger):
 
         for key, table in self.table_layout.items():
             table.prepare(
-                rows=[(name, game_id) for game_id, name, role, bot in self.assignment if role == key]
+                rows=[(player["name"], game_id) for game_id, player in sorted(self.assignment.items()) if player["role"] == key]
             )
 
     # -------------------------------------- These methods need to be moved elsewhere ------------------------- #
@@ -218,10 +218,10 @@ class GameFrame(QWidget, Logger):
                 name.replace("_", " ").capitalize()
                 for name in customer_labels]}
 
-        return {"labels": labels[role], 
+        return {"labels": labels[role],
                 "fancy_labels": fancy_labels[role]}
 
-    # ----------------------------------------------------------------------------------------------- # 
+    # ----------------------------------------------------------------------------------------------- #
 
     def update_tables(self, parameters):
 
@@ -229,7 +229,7 @@ class GameFrame(QWidget, Logger):
 
         for role in self.table_layout.keys():
 
-            ids[role] = [(name, game_id) for game_id, name, r, bot in self.assignment if role == r]
+            ids[role] = [(player["name"], game_id) for game_id, player in sorted(self.assignment.items()) if player["role"] == role]
 
             self.table_layout[role].update(ids[role], parameters)
 

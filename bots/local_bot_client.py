@@ -13,7 +13,8 @@ class HotellingLocalBots(Logger, Thread):
 
     with open("hotelling_server/parameters/game.json") as f:
         game_parameters = json.load(f)
-    
+
+    # load conditions
     with open("hotelling_server/parameters/means.p", "rb") as f:
         customer_extra_view_means = pickle.load(f)
 
@@ -21,7 +22,7 @@ class HotellingLocalBots(Logger, Thread):
 
     def __init__(self, controller, n_firms, n_customers, n_agents_to_wait, condition):
         super().__init__()
-        
+
         self.controller = controller
         self.time_manager = controller.time_manager
         self.data = controller.data
@@ -31,7 +32,7 @@ class HotellingLocalBots(Logger, Thread):
         self.n_customers = n_customers
         self.n_firms = n_firms
         self.n_agents_to_wait = n_agents_to_wait
-        
+
         # set condition
         self.customer_extra_view_means = self.customer_extra_view_means[condition]
 
@@ -46,12 +47,16 @@ class HotellingLocalBots(Logger, Thread):
     # ---------------------------------------------------------- #
 
     def run(self):
-        
+
         self._stop_event.clear()
+
+        self.log("Waiting players...", level=1)
 
         while True:
 
-            # if all non bot agents are connected break
+            Event().wait(1)
+
+            # if all non bot agents are connected then break
             non_bots = self.get_non_bot_agents()
             cond = len(non_bots) == self.n_agents_to_wait
 
@@ -61,15 +66,17 @@ class HotellingLocalBots(Logger, Thread):
             if not self.controller.server.is_alive() or self.stopped():
                 return 0
 
+        self.log("Bot initialization...", level=1)
+
         # start to init bots
         self.init()
 
-        self.log("Game is starting.")
-        
+        self.log("Game is starting.", level=1)
 
-        # ------------ Game start ------------------------ # 
+        # ------------ Game start ------------------------ #
         while True:
 
+            # play bot firms
             for firm_id in self.data.bot_firms_id.values():
 
                 if self.data.current_state["firm_status"][firm_id] == "active":
@@ -80,7 +87,9 @@ class HotellingLocalBots(Logger, Thread):
 
                 self.data.save()
 
+            # play bot customers
             for customer_id in self.data.bot_customers_id.values():
+
                 self.play_customer(customer_id)
                 self.data.save()
 
@@ -89,12 +98,12 @@ class HotellingLocalBots(Logger, Thread):
             self.time_manager.check_state()
 
             if self.time_manager.state == "end_game" or self.controller.server.shutdown_event.is_set() \
-                    or self.stopped() or not self.controller.running_game.is_set():
+                or self.stopped() or not self.controller.running_game.is_set():
 
-                    self.set_bots_to_end_state()
-                    self.log("Game ends, bots are going to shutdown.")
+                self.set_bots_to_end_state()
+                self.log("Game ends, bots are going to shutdown.")
 
-                    break
+                break
 
     # ---------------------------------------------------------- #
 
@@ -129,11 +138,11 @@ class HotellingLocalBots(Logger, Thread):
 
     def init(self):
 
-        for game_id, server_id, role, bot in self.data.assignment:                
+        for game_id, player in sorted(self.data.assignment.items()):
 
-            # --------------- init customers ------------------------------------ # 
+            # --------------- init customers ------------------------------------ #
 
-            if bot and role == "customer":
+            if player["bot"] and player["role"] == "customer":
 
                 self.n_agents_to_wait += 1
 
@@ -147,9 +156,9 @@ class HotellingLocalBots(Logger, Thread):
                     self.data.roles[game_id] = "customer"
                     self.data.current_state["time_since_last_request_customers"][customer_id] = " ✔ "
 
-            # --------------- init firms ------------------------------------ # 
+            # --------------- init firms ------------------------------------ #
 
-            if bot and role == "firm":
+            elif player["bot"] and player["role"] == "firm":
 
                 firm_id = len(self.data.firms_id)
 
@@ -179,7 +188,7 @@ class HotellingLocalBots(Logger, Thread):
             self.log(
                 "Error: "
                 "Remaining agents to connect although all bots "
-                "and all real players seem to be connected.")
+                "and all real players seem to be connected.", level=3)
 
     # -------------------------------- customer ------------------------------------------- #
     def play_customer(self, customer_id):

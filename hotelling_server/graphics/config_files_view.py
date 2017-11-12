@@ -11,7 +11,8 @@ class ConfigFilesWindow(QWidget):
 
         super().__init__()
 
-        self.parent = parent
+        self._parent = parent
+
         self.setWindowTitle("Edit config files")
         self.param = param
 
@@ -21,6 +22,9 @@ class ConfigFilesWindow(QWidget):
         self.tabs = QTabWidget(self)
 
         self.setup()
+
+    def parent(self):
+        return self._parent
 
     def setup(self):
 
@@ -48,7 +52,7 @@ class ConfigFilesWindow(QWidget):
     def push_write_button(self):
 
         for key in self.param.keys():
-            self.parent.write_parameters(key, self.tab_values[key].get_values())
+            self.parent().write_parameters(key, self.tab_values[key].get_values())
 
         self.hide()
 

@@ -1,3 +1,4 @@
+import time
 import numpy as np
 from bots.local_bot_client import HotellingLocalBots
 
@@ -24,6 +25,8 @@ class Game(Logger):
         self.n_customers = self.game_parameters["n_customers"]
         self.n_firms = self.game_parameters["n_firms"]
         self.n_agents = self.n_firms + self.n_customers
+
+        self.client_time = {}
 
         # ---------------- #
         self.bots = None
@@ -57,7 +60,7 @@ class Game(Logger):
 
         self.data.current_state["firm_prices"] = \
             np.random.randint(1, self.game_parameters["n_prices"], size=2)
-        
+
         # init customer current_state arrays
         customer_keys = (
             "customer_extra_view_choices",
@@ -95,19 +98,23 @@ class Game(Logger):
         # count non bots agents and wait for them before running
         n_agents_to_wait = 0
 
-        for game_id, server_id, role, bot in self.assignment:
-            if bot:
-                n_firms += role == "firm"
-                n_customers += role == "customer"
+        for game_id, player in sorted(self.assignment.items()):
+
+            if player["bot"]:
+                n_firms += player["role"] == "firm"
+                n_customers += player["role"] == "customer"
             else:
                 n_agents_to_wait += 1
 
         if n_firms > 0 or n_customers > 0:
-            self.bots = \
-                HotellingLocalBots(
-                    self.controller, n_firms, n_customers, n_agents_to_wait,
-                    self.interface_parameters["condition"])
 
+            self.bots = HotellingLocalBots(
+                controller=self.controller,
+                n_firms=n_firms,
+                n_customers=n_customers,
+                n_agents_to_wait=n_agents_to_wait,
+                condition=self.interface_parameters["condition"]
+            )
 
             self.bots.start()
 
@@ -128,7 +135,7 @@ class Game(Logger):
         whole = [i for i in request.split("/") if i != ""]
 
         # retrieve method
-        command = eval("self.{}".format(whole[0]))
+        command = getattr(self, whole[0])
 
         # retrieve method arguments
         args = [int(a) if a.isdigit() else a for a in whole[1:]]
@@ -250,7 +257,8 @@ class Game(Logger):
     def check_end(self, client_t):
         return int(client_t == self.time_manager.ending_t) if self.time_manager.ending_t else 0
 
-    def reply(self, *args):
+    @staticmethod
+    def reply(*args):
 
         msg = {
             "game_id": args[0],
@@ -258,22 +266,32 @@ class Game(Logger):
                 [str(a) if type(a) in (int, np.int64) else a.replace("ask", "reply") for a in args[1:]]
             ))}
 
-        return ("reply", msg) 
+        return ("reply", msg)
 
-    def reply_error(self, msg):
-        return ("error", msg) 
+    @staticmethod
+    def reply_error(msg):
+        return ("error", msg)
 
     def get_all_states(self):
         return self.data.current_state["firm_states"] + self.data.current_state["customer_states"]
 
     def is_ended(self):
         return all(state == "end_game" for state in self.get_all_states())
-    
+
     def get_prices_and_positions(self):
         return self.data.current_state["firm_positions"], self.data.current_state["firm_prices"]
-    
+
     def set_state(self, role, role_id, state):
         self.data.current_state["{}_states".format(role)][role_id] = state
+
+    def set_time_since_last_request(self, game_id, role):
+
+        if game_id in self.client_time:
+
+            self.data.current_state["time_since_last_request_{}s".format(role)][game_id] = \
+                    abs(self.client_time[game_id] - time.time())
+
+        self.client_time[game_id] = time.time()
 
     # -----------------------------------| customer demands |--------------------------------------#
 
@@ -283,6 +301,8 @@ class Game(Logger):
 
         self.log("Customer {} asks for firm choices as t {}.".format(customer_id, t))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
+
+        self.set_time_since_last_request(game_id, "customer")
 
         if t == self.time_manager.t:
             if self.time_manager.state == "active_has_played":
@@ -311,6 +331,8 @@ class Game(Logger):
         self.log("Customer {} asks for recording his choice as t {}: "
                  "{} for extra view, {} for firm.".format(game_id, t, extra_view, firm))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
+
+        self.set_time_since_last_request(game_id, "customer")
 
         if t == self.time_manager.t:
 
@@ -345,6 +367,8 @@ class Game(Logger):
         opponent_id = (firm_id + 1) % 2
         self.log("Firm passive {} asks for opponent strategy.".format(firm_id))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
+
+        self.set_time_since_last_request(game_id, "firm")
 
         if t == self.time_manager.t:
 
@@ -387,6 +411,8 @@ class Game(Logger):
         self.log("Firm passive {} asks for its number of clients.".format(firm_id))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
 
+        self.set_time_since_last_request(game_id, "firm")
+
         if t == self.time_manager.t:
 
             if self.time_manager.state == "active_has_played_and_all_customers_replied":
@@ -396,7 +422,7 @@ class Game(Logger):
                     choices = self.get_client_choices(firm_id, t)
 
                     out = self.reply(game_id, function_name(), self.time_manager.t, choices, self.check_end(t))
-                    
+
                     self.firm_end_of_turn(firm_id=firm_id, t=t, status="passive")
 
                     state = "end_game" if self.check_end(t) else function_name()
@@ -426,6 +452,8 @@ class Game(Logger):
         self.log("Firm active {} asks to save its price and position.".format(firm_id))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
 
+        self.set_time_since_last_request(game_id=game_id, role="firm")
+
         if t == self.time_manager.t:
 
             out = self.reply(game_id, function_name(), self.time_manager.t)
@@ -454,6 +482,8 @@ class Game(Logger):
         self.log("Firm active {} asks the number of its clients.".format(firm_id))
         self.log("Client's time is {}, server's time is {}.".format(t, self.time_manager.t))
 
+        self.set_time_since_last_request(game_id, "firm")
+
         if t == self.time_manager.t:
 
             if self.time_manager.state == "active_has_played_and_all_customers_replied":
@@ -463,7 +493,7 @@ class Game(Logger):
                 out = self.reply(game_id, function_name(), self.time_manager.t, choices, self.check_end(t))
 
                 self.firm_end_of_turn(firm_id=firm_id, t=t, status="active")
-                
+
                 state = "end_game" if self.check_end(t) else function_name()
                 self.set_state(role="firm", role_id=firm_id, state=state)
 
@@ -481,7 +511,7 @@ class Game(Logger):
             choices = self.get_client_choices(firm_id, t)
             return self.reply(game_id, function_name(), t, choices, self.check_end(t))
 
-    # ---------------------------------------- Admin demands ------------------------------------------- # 
+    # ---------------------------------------- Admin demands ------------------------------------------- #
 
     def ask_admin_firm_choice(self, t):
         """called by admin"""
@@ -568,5 +598,3 @@ class Game(Logger):
                 self.get_client_choices(firm_active_id, t),
                 self.check_end(t)
             )
-
-

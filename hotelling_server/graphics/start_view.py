@@ -178,6 +178,7 @@ class StringParameter:
 
         self.label = QLabel(text)
         self.edit = QLineEdit(str(initial_value))
+        self.edit.setFixedWidth(310)
 
     def get_value(self):
 
@@ -202,6 +203,7 @@ class IntParameter:
 
         self.label = QLabel(text)
         self.edit = QLineEdit(str(initial_value))
+        self.edit.setFixedWidth(310)
 
     def get_value(self):
 
