@@ -69,7 +69,7 @@ class UI(QWidget, Logger, MessageBox):
 
         return 300, 100, w, h
 
-    # ------------------------ Called by controller methods ---------------------------------------- #
+    # ------------------------ Called by controller methods (besides show methods) --------------------- #
 
     def set_previous_parameters(self, params):
         """Set previous json parameters from data through controller.
@@ -98,10 +98,6 @@ class UI(QWidget, Logger, MessageBox):
 
         self.menubar_frames["messenger"].new_message_from_user(args[0], args[1])
 
-    # ----------------- called by views methods -------------------------------------------------------- #
-    def save_parameters(self, key, data):
-
-        self.param[key] = data
     # -------------------------------------------------------------------------------------------------- #
 
     def _get_parameters(self, *keys):
@@ -271,6 +267,7 @@ class UI(QWidget, Logger, MessageBox):
             QTimer.singleShot(100, self.look_for_msg)
 
     # ------------------------- "Show" methods -------------------------------------------------- #
+
     def show_frame_game(self):
 
         self.frames["game"].prepare()
@@ -319,7 +316,7 @@ class UI(QWidget, Logger, MessageBox):
 
         self.menubar_frames["missing_players"].show()
 
-    # ---------------------------------------------------------------------------------------------------------- #
+    # -------------------------------------- Message box related --------------------------------------------------------------- #
 
     def error_loading_session(self):
 
@@ -405,7 +402,13 @@ class UI(QWidget, Logger, MessageBox):
         else:
             self.show_info(msg="No file selected.")
 
-    # ----------------- Methods putting something in controller queue -------------- #
+    # ----------------- called by views methods -------------------------------------------------------- #
+
+    def save_parameters(self, key, data):
+
+        self.param[key] = data
+
+    # ----------------- and putting something in controller queue -------------- #
 
     def update_game_view_data(self):
         self.controller_queue.put(("ui_update_game_view_data", ))

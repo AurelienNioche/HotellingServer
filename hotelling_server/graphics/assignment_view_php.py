@@ -193,7 +193,7 @@ class AssignmentFramePHP(Logger, QWidget):
         self.setFocus()
 
         # update waiting list view
-        self.timer = Timer(self, self.ask_for_updating_waiting_list, 1000)
+        self.timer = Timer(self, self.ask_for_updating_waiting_list, 3)
         self.timer.start()
 
     # ---------------------- PUSH BUTTONS --------------------------------- #
@@ -204,6 +204,7 @@ class AssignmentFramePHP(Logger, QWidget):
 
         if warning:
             self.parent().show_warning(msg=warning)
+            self.autostart = False
 
         else:
             self.log("Push 'next' button.")
@@ -392,6 +393,8 @@ class Timer(Thread):
 
             try:
                 self.func()
-                Event().wait(np.random.randint(2))
+
             except:
-                Event().wait(np.random.randint(2))
+                pass
+
+            Event().wait(self.interval)

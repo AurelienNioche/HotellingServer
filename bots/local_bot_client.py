@@ -21,6 +21,7 @@ class HotellingLocalBots(Logger, Thread):
     # ---------------------------------------------------------- #
 
     def __init__(self, controller, n_firms, n_customers, n_agents_to_wait, condition):
+
         super().__init__()
 
         self.controller = controller
@@ -73,7 +74,13 @@ class HotellingLocalBots(Logger, Thread):
 
         self.log("Game is starting.", level=1)
 
-        # ------------ Game start ------------------------ #
+        # play loop
+        self.play()
+
+    def play(self):
+
+     # ------------ Game starts ------------------------ #
+
         while True:
 
             # play bot firms
@@ -104,6 +111,7 @@ class HotellingLocalBots(Logger, Thread):
                 self.log("Game ends, bots are going to shutdown.")
 
                 break
+
 
     # ---------------------------------------------------------- #
 
@@ -309,4 +317,3 @@ class HotellingLocalBots(Logger, Thread):
         self.data.current_state["n_client"][firm_id] = n
 
         self.time_manager.check_state()
-
